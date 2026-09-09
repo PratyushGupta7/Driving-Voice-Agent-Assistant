@@ -4,6 +4,7 @@ import logging
 import re
 from typing import Any
 
+from .llm_revision import parse_turn_with_openrouter
 from .models import MissionConstraints, MissionPatch, PlaceCandidate, SessionPrefs
 from .revision import parse_turn
 
@@ -32,8 +33,9 @@ _GENERIC = {
 }
 
 
-def nlu_mode(_settings: Any) -> str:
-    """Product NLU is the phrase parser. Azure is not on the turn path."""
+def nlu_mode(settings: Any) -> str:
+    if settings and getattr(settings, "openrouter_api_key", None):
+        return "openrouter"
     return "rules"
 
 
@@ -102,7 +104,13 @@ async def resolve_patch(
     offered: list[PlaceCandidate] | None = None,
     prefs: SessionPrefs | None = None,
 ) -> tuple[MissionPatch, str]:
-    """Rules parser only. `settings` / `prefs` kept so call sites stay stable."""
-    del settings, prefs
+    del prefs
+    if settings and getattr(settings, "openrouter_api_key", None):
+        try:
+            llm_patch = await parse_turn_with_openrouter(settings, text, current)
+            if llm_patch and llm_patch.operation != "unrelated":
+                return sanitize_patch(llm_patch, text, offered), "openrouter"
+        except Exception as exc:
+            logger.warning("openrouter resolve failed, falling back to rules: %s", exc)
     patch = parse_turn(text, current)
     return sanitize_patch(patch, text, offered), "rules"

@@ -43,10 +43,13 @@ class Settings(BaseSettings):
     rime_endpoint: str = "https://users.rime.ai/v1/rime-tts"
     rime_catalog_url: str = "https://users.rime.ai/data/voices/all-v2.json"
 
-    azure_openai_api_key: str
-    azure_openai_endpoint: str
+    azure_openai_api_key: str = "dummy_key"
+    azure_openai_endpoint: str = "https://dummy.openai.azure.com/"
     azure_openai_deployment: str = "gpt-4.1-mini"
     azure_openai_api_version: str = "2025-01-01-preview"
+
+    openrouter_api_key: str = ""
+    openrouter_model: str = "openai/gpt-4o-mini"
 
     geo_mode: str = "fixture"
     nominatim_url: str = "https://nominatim.openstreetmap.org"

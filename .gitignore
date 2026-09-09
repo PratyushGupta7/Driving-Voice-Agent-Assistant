@@ -37,3 +37,4 @@ artifacts/*
 
 # uv
 apps/agent/uv.lock.bak
+apps/web/package-lock.json

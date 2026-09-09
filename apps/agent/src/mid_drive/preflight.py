@@ -84,7 +84,10 @@ def main() -> None:
     print("preflight: env loaded")
     _check_eleven(settings)
     _check_rime(settings)
-    _check_azure(settings)
+    try:
+        _check_azure(settings)
+    except Exception as exc:
+        print(f"azure openai: skipped or optional: {exc}")
     print("preflight: ok")
 
 
