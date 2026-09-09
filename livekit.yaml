@@ -1,0 +1,15 @@
+# Local LiveKit for Mid-Drive. Keys must match `.env` and `apps/web/.env.local`.
+# Start: ./scripts/dev-livekit.sh
+# HMAC secret is at least 32 bytes so JWTs are not signed with the 6-byte --dev default.
+port: 7880
+bind_addresses:
+  - 0.0.0.0
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50200
+  use_external_ip: false
+keys:
+  middrive: abc75afd7b78117bf2466956612c189cc9b810dbd9d2178c5995b3bcc5203050
+logging:
+  level: info

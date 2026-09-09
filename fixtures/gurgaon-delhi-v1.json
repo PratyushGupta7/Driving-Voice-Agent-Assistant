@@ -1,0 +1,116 @@
+{
+  "id": "gurgaon-delhi-v1",
+  "as_of": "2026-09-08",
+  "route": {
+    "origin_name": "Cyber Hub, Gurugram",
+    "destination_name": "Connaught Place, Delhi",
+    "origin": { "lat": 28.4947, "lng": 77.0883 },
+    "destination": { "lat": 28.6315, "lng": 77.2167 },
+    "duration_s": 1705,
+    "distance_m": 23103,
+    "provider": "osrm+fixture",
+    "geometry": [
+      [77.088447, 28.494219],
+      [77.08844, 28.492913],
+      [77.087276, 28.495411],
+      [77.0891, 28.497784],
+      [77.089187, 28.499187],
+      [77.093533, 28.504112],
+      [77.094389, 28.50802],
+      [77.092501, 28.511794],
+      [77.094773, 28.516683],
+      [77.10508, 28.531868],
+      [77.112524, 28.536043],
+      [77.118172, 28.542848],
+      [77.125265, 28.547887],
+      [77.131324, 28.552966],
+      [77.134073, 28.567835],
+      [77.134718, 28.570588],
+      [77.141199, 28.574529],
+      [77.144761, 28.579389],
+      [77.147157, 28.586494],
+      [77.151542, 28.588275],
+      [77.160151, 28.591978],
+      [77.16642, 28.594504],
+      [77.175351, 28.599211],
+      [77.186035, 28.605005],
+      [77.191215, 28.609839],
+      [77.189951, 28.614341],
+      [77.190874, 28.617934],
+      [77.193007, 28.620543],
+      [77.195056, 28.621836],
+      [77.198142, 28.625007],
+      [77.200506, 28.624275],
+      [77.205819, 28.62666],
+      [77.20714, 28.627413],
+      [77.209104, 28.625592],
+      [77.211908, 28.623976],
+      [77.214955, 28.626539],
+      [77.217673, 28.630081],
+      [77.217031, 28.631139],
+      [77.216717, 28.631504]
+    ]
+  },
+  "places": {
+    "coffee": [
+      {
+        "id": "blue-tokai-cyber-hub",
+        "name": "Blue Tokai Coffee Roasters",
+        "area": "Cyber Hub",
+        "lat": 28.4955,
+        "lng": 77.0888,
+        "parking": "yes",
+        "detour_minutes": 7
+      },
+      {
+        "id": "starbucks-cyber-hub",
+        "name": "Starbucks",
+        "area": "Cyber Hub",
+        "lat": 28.4956427,
+        "lng": 77.08891,
+        "parking": "yes",
+        "detour_minutes": 6
+      },
+      {
+        "id": "third-wave-dlf-2",
+        "name": "Third Wave Coffee",
+        "area": "DLF Phase 2",
+        "lat": 28.4868,
+        "lng": 77.093,
+        "parking": "unknown",
+        "detour_minutes": 5
+      },
+      {
+        "id": "chai-point-kiosk",
+        "name": "Chai Point",
+        "area": "NH 48 lay-by",
+        "lat": 28.482,
+        "lng": 77.078,
+        "parking": "no",
+        "detour_minutes": 3
+      }
+    ],
+    "fuel": [
+      {
+        "id": "ioc-hero-honda",
+        "name": "Indian Oil",
+        "area": "NH 48, near Hero Honda Chowk",
+        "lat": 28.4795,
+        "lng": 77.072,
+        "parking": "yes",
+        "detour_minutes": 4
+      }
+    ],
+    "pharmacy": [
+      {
+        "id": "apollo-mg-road",
+        "name": "Apollo Pharmacy",
+        "area": "MG Road",
+        "lat": 28.4806,
+        "lng": 77.0803,
+        "parking": "yes",
+        "detour_minutes": 8
+      }
+    ]
+  }
+}
