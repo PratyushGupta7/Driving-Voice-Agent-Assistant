@@ -1,0 +1,33 @@
+[project]
+name = "mid-drive"
+version = "0.1.0"
+description = "Mid-Drive interruptible voice mission agent for DataForge / Rime"
+authors = [
+    { name = "PratyushGupta7", email = "pratyushg1234@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "aiosqlite>=0.21.0",
+    "httpx>=0.28.1",
+    "livekit-agents[elevenlabs,openai,rime,silero]>=1.6.1,<2",
+    "pydantic-settings>=2.15.0",
+    "python-dotenv>=1.2.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.0",
+    "pytest-asyncio>=1.0.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[project.scripts]
+mid-drive = "mid_drive.main:main"
+mid-drive-preflight = "mid_drive.preflight:main"
+
+[build-system]
+requires = ["uv_build>=0.9.18,<0.10.0"]
+build-backend = "uv_build"
