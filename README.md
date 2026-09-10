@@ -1,70 +1,89 @@
 <p align="center">
   <strong>Mid-Drive</strong><br/>
-  <em>I built a voice copilot that survives being interrupted — mid-sentence, mid-search, mid-drive.</em><br/>
-  DataForge 2026 · Rime challenge · Cyber Hub → Connaught Place
+  <em>We built a voice copilot that stays correct when you interrupt it — mid-sentence, mid-search, mid-drive.</em>
 </p>
 
 <p align="center">
-  <strong>131 tests</strong> · <strong>0 stale admissions</strong> · <strong>8 s stress delay</strong> · Rime Coda / astra · full duplex
+  DataForge 2026 · Rime Challenge · Cyber Hub → Connaught Place
+</p>
+
+<p align="center">
+  <code>131 tests</code> &nbsp;·&nbsp; <code>0 stale admissions</code> &nbsp;·&nbsp; <code>8 s stress delay</code> &nbsp;·&nbsp; <code>3:30 demo</code> &nbsp;·&nbsp; Rime Coda / astra · full duplex
 </p>
 
 ---
 
-## The moment that broke every demo I tried
+## Why we built this
 
-I'm on the NH-48 corridor, one hand on the wheel, eyes on the road. I ask for coffee. The assistant starts talking. A second later I remember — *I need parking*. I cut it off.
+Picture the NH-48 run into Delhi. One hand on the wheel. Eyes forward. We ask for coffee — the assistant starts answering — and two seconds later we remember: **we need parking too**. We cut it off mid-sentence.
 
-Most voice agents do one of three things:
+That single moment exposes everything wrong with most voice products.
 
-1. Keep playing the old answer in my ear.
-2. Accept the new words but **apply the old search result** when it finally lands.
-3. Cancel everything and make me start over.
+| What usually happens | Why it fails on the road |
+|---|---|
+| Old audio keeps playing | We're hearing an answer we already rejected |
+| New words land, **old search result wins** | A delayed API call overwrites what we actually asked for |
+| Everything resets | We lose context and start from zero |
 
-That's not a driving copilot. That's a chatbot with a play button.
+None of that is a copilot. That's a chatbot wearing a microphone.
 
-**Mid-Drive** is what I built instead: a hands-busy mission runtime where **Rime is the voice**, LiveKit carries full-duplex audio, and a fence I can actually *see* on screen stops dead work from hijacking live work.
+**Mid-Drive** is our answer: a hands-busy **mission runtime** where speech *is* the interface, **Rime** carries every spoken line, and a **fence cockpit** on screen shows stale work getting rejected in real time — so nobody has to take our word for it.
 
-Remove speech and the product disappears. That's intentional.
+Remove voice and the product collapses. That isn't a limitation. That's the point.
 
 ---
 
-## What I'm claiming — and how I prove it
+## Our hard claim — and the numbers behind it
 
-> Once my per-session actor linearizes the user-speech barrier, no artifact from an older output epoch can enter active mission state, new TTS input, or user-visible application output.
+> Once our per-session actor linearizes the user-speech barrier, no artifact from an older output epoch can enter active mission state, new TTS input, or user-visible application output.
 
-I'm solving two hard voice problems from the Rime brief:
+We're proving two voice problems from the Rime brief — not as slides, as running software:
 
-| Problem | What I ship |
+| Voice problem | What we ship |
 |---|---|
-| **Interruption and recovery** | VAD closes the output barrier at speech onset; queued Rime playout stops; stale tool results can't re-enter TTS or mission state |
-| **Conversation continuity during tool work** | I can add constraints, ask "what's taking so long?", or interrupt while an **8-second** fixture search runs — delayed results get fenced, not applied to the wrong version |
+| **Interruption and recovery** | VAD closes the output barrier at speech onset. Queued Rime playout stops. Stale tool results cannot re-enter TTS or mission state. |
+| **Conversation continuity during tool work** | We add constraints, ask *"what's taking so long?"*, or interrupt while an **8-second** search runs — and delayed results get **fenced**, not applied to the wrong mission version. |
 
-**The numbers behind the claim:**
+### By the numbers
 
-| Stat | Value |
-|---|---|
-| Automated evidence rounds | **3** |
-| Stale results admitted | **0** |
-| Stale results rejected | **3** |
-| Regression tests | **131** (`uv run pytest`) |
-| Demo runtime | **3:30** (under the 5 min cap) |
-| Fixture v2 search delay | **8.0 s** (`FIXTURE_V2_DELAY_S`) |
-| Mission versions in stress demo | **v1 → v3** (coffee → parking → tolls) |
+| Metric | Result | How we verify |
+|---|---|---|
+| Regression tests | **131** | `uv run pytest` |
+| Evidence rounds | **3** | `uv run python -m mid_drive.evidence` |
+| Stale results admitted | **0** | Hard fail if non-zero |
+| Stale results rejected | **3** | Logged in `artifacts/evidence-fence.json` |
+| Demo runtime | **3:30** | Under the 5-minute submission cap |
+| Stress search delay | **8.0 s** | `FIXTURE_V2_DELAY_S` — deliberate, reproducible |
+| Mission arc in stress demo | **v1 → v3** | Coffee → parking hold → toll avoidance |
+| Rime sample rate | **24 kHz** | HTTP PCM, 20 ms aligned frames |
 
-Repeatable proof: [`RIME_EVIDENCE.md`](RIME_EVIDENCE.md) · one command: `uv run python -m mid_drive.evidence`
+Full acceptance test, procedure, and repeatable commands: [`RIME_EVIDENCE.md`](RIME_EVIDENCE.md)
 
 ---
 
-## Run it in five minutes
+## What judges see in 60 seconds
 
-I kept setup boring on purpose — three terminals, one corridor, deterministic fixture geo so judges get the same story every time.
+We optimized the first minute for clarity — not feature breadth.
+
+1. **Start drive** at [localhost:3000](http://localhost:3000) → allow mic → wait for Rime's greeting.
+2. Flip **Open mic** → say *"Find a coffee shop near my route."*
+3. Rime acks immediately → names **Chai Point** → pin drops on the map.
+4. Cockpit shows mission **v1**, tokens **ACCEPTED**, provider badge **Rime · coda · astra**.
+
+That's the normal path. The stress path — interrupt + 8 s delay + constraint change — is where our fence earns its keep. We walk through it beat-by-beat in [Our demo script](#our-330-demo--one-drive-ten-beats).
+
+---
+
+## Run it locally
+
+We kept setup deliberately boring: three terminals, one fixed corridor, deterministic fixture geo so every judge gets the same story.
 
 ```bash
 git clone https://github.com/PratyushGupta7/Driving-Voice-Agent-Assistant.git
 cd "Driving-Voice-Agent-Assistant"
 
 cp .env.example .env
-# I fill: ELEVEN_API_KEY, RIME_API_KEY, AZURE_OPENAI_*
+# Fill: ELEVEN_API_KEY, RIME_API_KEY, AZURE_OPENAI_*
 
 cp apps/web/.env.local.example apps/web/.env.local
 
@@ -72,19 +91,13 @@ cd apps/agent && uv sync
 cd ../web && npm install
 ```
 
-| Terminal | What I run |
+| Terminal | Command |
 |---|---|
-| 1 | `./scripts/dev-livekit.sh` |
-| 2 | `cd apps/agent && uv run python -m mid_drive.main start` |
-| 3 | `cd apps/web && npm run dev` |
+| 1 · LiveKit | `./scripts/dev-livekit.sh` |
+| 2 · Agent | `cd apps/agent && uv run python -m mid_drive.main start` |
+| 3 · Web | `cd apps/web && npm run dev` |
 
-Then I open **http://localhost:3000** → allow mic → **Start drive** → wait for Rime's greeting → flip **Open mic** → say:
-
-> “Find a coffee shop near my route.”
-
-If everything's wired: Rime acks immediately, names **Chai Point**, the map pin lands, and the cockpit shows mission **v1** with tokens marked **ACCEPTED**.
-
-**Before I record or submit**, I always run:
+**Before we record or submit**, we always run:
 
 ```bash
 cd apps/agent
@@ -92,98 +105,117 @@ uv run python -m mid_drive.preflight    # live Rime catalog + PCM sanity check
 uv run python -m mid_drive.evidence     # fence proof → artifacts/evidence-fence.json
 ```
 
+Worker is healthy when logs show `registered worker … agent_name: mid-drive`.
+
 ---
 
-## How I designed it — two counters, one fence
+## How it works — two counters, one fence
 
-Most agents track one "context." I split **safety** from **semantics** because drivers change their mind faster than tools finish.
+Most voice stacks track a single "context." We split **safety** from **semantics** because drivers revise faster than tools finish.
 
 ```text
-Browser (Next.js + MapLibre + fence cockpit)
+Browser (Next.js + MapLibre + Fence Cockpit)
   │  WebRTC audio + data channel
   ▼
 LiveKit Server (local)
   │  Silero VAD · ElevenLabs STT · SafeRimeTTS
   ▼
 SessionActor — single writer, no races
-  ├── output_epoch      ← bumps the instant I start speaking (VAD onset)
-  ├── mission_version   ← bumps when my constraint actually changes
+  ├── output_epoch      ← bumps the instant the driver starts speaking (VAD onset)
+  ├── mission_version   ← bumps when a real constraint changes
   ├── ResultFence       ← rejects tokens from dead epochs
   └── MissionController ← rules-first NLU, template acks, orchestrator
         ▼
-Fixture corridor (judged default) or live OSM stack
+Fixture corridor (judged default)  ·  or  ·  live OSM stack
 ```
 
 ```mermaid
 sequenceDiagram
-    participant Me as Driver
+    participant Driver
     participant VAD
     participant Actor
     participant Tools
     participant Rime
 
-    Me->>Rime: Find coffee near my route
+    Driver->>Rime: Find coffee near my route
     Rime->>Tools: search (epoch 1)
     Tools-->>Rime: Chai Point accepted
-    Rime->>Me: Chai Point is on the way…
+    Rime->>Driver: Chai Point is on the way…
 
-    Me->>VAD: Wait, I need parking too
+    Driver->>VAD: Wait, I need parking too
     VAD->>Actor: output_epoch++ · BARRIER_CLOSED
     Actor->>Rime: interrupt playout
+    Rime->>Driver: Got it — parking required…
 
-    Me->>Actor: Another one
+    Driver->>Actor: Another one
     Note over Tools: v2 search — 8 s delay
 
-    Me->>VAD: Avoid toll roads too
+    Driver->>VAD: Avoid toll roads too
     VAD->>Actor: output_epoch++ · mission v3
     Tools-->>Actor: v3 Starbucks accepted
     Tools-->>Actor: v2 returns → STALE_REJECTED
-    Rime->>Me: Starbucks… parking lot… toll-avoiding route
+    Rime->>Driver: Starbucks… parking lot… toll-avoiding route
 ```
 
-| Counter | When it moves | Why I need it |
+### The two counters
+
+| Counter | When it moves | What it protects |
 |---|---|---|
-| `output_epoch` | Silero VAD detects my speech | Kills in-flight TTS, tools, and UI sinks **immediately** — before transcription even finishes |
-| `mission_version` | A completed turn changes a real constraint | Tracks what I *meant*, not just that I made a sound |
+| `output_epoch` | Silero VAD detects driver speech | In-flight TTS, tools, and UI sinks — **immediately**, before transcription finishes |
+| `mission_version` | Completed turn with a material constraint change | What the driver *meant*, not just that they made a sound |
 
-Cancellation is best-effort. **Correctness is the fence.** When v2 comes back late, the cockpit shows **OBSOLETE** — auditable, not silent.
+```text
+ACTIVE (mission v2, epoch 3)
+  │
+  │ driver starts speaking — VAD fires
+  ▼
+BARRIER_CLOSED (still v2, epoch 4)     ← old work dies here
+  │
+  │ completed turn: "avoid tolls"
+  ▼
+ACTIVE (mission v3, epoch 4)             ← new search, new tokens
+```
 
-Core code: `session_actor.py` · `result_fence.py` · `orchestrator.py` · `controller.py` · `evidence.py`
+Cancellation is best-effort. **Correctness is the fence.** When v2 returns late, the cockpit shows **OBSOLETE** — auditable, never silent.
+
+Core modules: `session_actor.py` · `result_fence.py` · `orchestrator.py` · `controller.py` · `evidence.py`
 
 ---
 
-## My stack — and why each piece earns its place
+## Our stack
 
-| Layer | Choice | My reasoning |
+| Layer | Choice | Why we picked it |
 |---|---|---|
-| Transport | **LiveKit** (local server) | Full duplex in the browser; VAD-owned turns; interruption API I can actually hook |
-| STT | **ElevenLabs Scribe v2 Realtime** | Partials for the UI; committed text drives NLU — I don't guess on half-heard words |
-| TTS | **Rime Coda / astra** | Every driver-facing line on the judged path — acks, results, holds, status. Not just a welcome message |
+| Transport | **LiveKit** (local server) | Full duplex in-browser; VAD-owned turns; interruption API we can hook into |
+| VAD | Silero | Speech onset → epoch bump before STT finishes |
+| STT | **ElevenLabs Scribe v2 Realtime** | Partials for UI; committed text drives NLU — no guessing on half-heard words |
+| TTS | **Rime Coda / astra** | Every driver-facing line on the judged path — acks, results, holds, status |
 | NLU | **Phrase grammar** (`NLU_MODE=rules`) | Immediate acks; no LLM roulette on the hot path |
-| LLM | Azure gpt-4.1-mini | LiveKit session stub + preflight; **not** my spoken output path |
-| Geo (judged) | `fixtures/gurgaon-delhi-v1.json` | Same shops, same delays, same OBSOLETE moment — every run |
-| Geo (optional) | Nominatim + OSRM + Overpass | `GEO_MODE=live` when I want real Delhi/Gurgaon data |
-| UI | Next.js + MapLibre + **CockpitHUD** | I built the HUD so judges don't have to trust my word — they watch the fence work |
+| LLM | Azure gpt-4.1-mini | LiveKit session stub + preflight only — **not** our spoken output |
+| Geo (judged) | `fixtures/gurgaon-delhi-v1.json` | Same shops, same 8 s delay, same OBSOLETE moment — every run |
+| Geo (optional) | Nominatim + OSRM + Overpass | `GEO_MODE=live` for real Delhi/Gurgaon data |
+| UI | Next.js + MapLibre + **CockpitHUD** | We built the HUD so the fence is visible, not asserted |
+| Store | SQLite + JSONL session logs | Atomic fence decisions + audit trail |
 
 ### Third-party services
 
 | Service | Role | Config |
 |---|---|---|
-| **Rime** | Primary spoken output | `RIME_*` |
+| **Rime** | Primary spoken output — every turn | `RIME_*` |
 | **ElevenLabs** | Realtime STT | `ELEVEN_API_KEY` |
 | **Azure OpenAI** | Session stub / preflight | `AZURE_OPENAI_*` |
 | **LiveKit** | WebRTC + VAD + turn handling | `LIVEKIT_*` |
 | **OSM stack** | Optional live geo | `GEO_MODE=live` |
 
-All API keys stay **server-side**. The browser gets a short-lived LiveKit JWT — never my Rime or ElevenLabs credentials.
+All API keys stay **server-side**. The browser receives a short-lived LiveKit JWT — never our Rime, ElevenLabs, or Azure credentials.
 
-The active speech provider is visible in the UI badges: **TTS · Rime · coda · astra · http-pcm**.
+Active speech provider is visible in the UI: **TTS · Rime · coda · astra · http-pcm**.
 
 ---
 
-## Exact Rime config I ship (judged path)
+## Exact Rime configuration (judged path)
 
-I validate `astra` against the **live catalog** at preflight — not a stale speaker list baked into the app.
+We validate `astra` against the **live catalog** at preflight — not a stale speaker list baked into the app.
 
 | Setting | Value |
 |---|---|
@@ -196,25 +228,25 @@ I validate `astra` against the **live catalog** at preflight — not a stale spe
 | Audio format | `audio/pcm`, **24 kHz**, 20 ms aligned frames |
 | Integration | `pipeline.build_tts()` → `SafeRimeTTS` |
 
-`AZURE_SPEAK=false` on the judged path — Rime owns every spoken line. Full acceptance test and results: [`RIME_EVIDENCE.md`](RIME_EVIDENCE.md).
+`AZURE_SPEAK=false` on the judged path — **Rime owns every spoken line.** Acceptance test and results: [`RIME_EVIDENCE.md`](RIME_EVIDENCE.md).
 
 ---
 
 ## Configuration hygiene
 
-I treat secrets like fuel caps — necessary, never loose in the repo.
+We treat secrets like fuel caps — necessary, never loose in the repo.
 
-1. Copy [`.env.example`](.env.example) → `.env`. **I never commit `.env`.**
+1. Copy [`.env.example`](.env.example) → `.env`. **We never commit `.env`.**
 2. Empty placeholders for real keys: `ELEVEN_API_KEY`, `RIME_API_KEY`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`.
-3. `LIVEKIT_*` in the example matches my **local** `livekit.yaml` dev server — not production.
-4. Judged defaults (already set in `.env.example`):
+3. `LIVEKIT_*` in the example matches our **local** `livekit.yaml` dev server — not production credentials.
+4. Judged defaults (already in `.env.example`):
 
-   | Variable | Default | Why I keep it |
+   | Variable | Default | Why |
    |---|---|---|
    | `GEO_MODE` | `fixture` | Deterministic corridor + 8 s v2 delay |
    | `NLU_MODE` | `rules` | Grammar-first; fast acks |
    | `AZURE_SPEAK` | `false` | Rime-only on the hot path |
-   | `FIXTURE_V2_DELAY_S` | `8.0` | The stress case that exposes stale rejects |
+   | `FIXTURE_V2_DELAY_S` | `8.0` | Stress case that exposes stale rejects |
    | `RIME_SPEAKER` | `astra` | Live-catalog validated |
 
 5. Preflight before demo: `cd apps/agent && uv run python -m mid_drive.preflight`
@@ -223,11 +255,11 @@ Optional: `python scripts/write_env.py` scaffolds `.env` locally — it never em
 
 ---
 
-## My 3:30 demo — one drive, ten beats
+## Our 3:30 demo — one drive, ten beats
 
-**Settings I lock:** `GEO_MODE=fixture` · `NLU_MODE=rules` · `AZURE_SPEAK=false` · **Open mic** after greeting.
+**Locked settings:** `GEO_MODE=fixture` · `NLU_MODE=rules` · `AZURE_SPEAK=false` · **Open mic** after greeting.
 
-This is the story I tell on camera — normal flow first, then I deliberately break it:
+We tell one story on camera: a normal drive that deliberately breaks under stress — then recovers cleanly.
 
 ```text
  1. Find a coffee shop near my route.      → Chai Point (v1)
@@ -242,16 +274,18 @@ This is the story I tell on camera — normal flow first, then I deliberately br
 10. Cockpit stale≥1 · run mid_drive.evidence on camera
 ```
 
-**What judges should see on the HUD:**
+### HUD checkpoints (what we point the camera at)
 
-- `BARRIER_CLOSED` the instant I interrupt (step 3)
-- `OBSOLETE` on v2 when v3 wins (step 7)
-- `stale ≥ 1` before I run evidence
-- Shop names on tool rows **only** when `ACCEPTED`
+| Beat | What the cockpit must show |
+|---|---|
+| Step 3 — interrupt | `BARRIER_CLOSED` the instant we cut Rime off |
+| Step 7 — toll change | `OBSOLETE` on v2; mission jumps to **v3** |
+| Step 10 — proof | `stale ≥ 1`; evidence CLI prints `stale_admissions: 0` |
+| Every turn | `nlu · rules`; shop names on tool rows **only** when `ACCEPTED` |
 
-**Deterministic fixture picks** (so I'm never improvising outcomes):
+### Deterministic fixture outcomes
 
-| I say | Rime names | Notes |
+| Driver says | Rime names | Notes |
 |---|---|---|
 | Coffee, no parking | **Chai Point** | Alt: Third Wave |
 | Coffee + parking (cold start) | **Blue Tokai** | |
@@ -259,24 +293,36 @@ This is the story I tell on camera — normal flow first, then I deliberately br
 | Fuel | **Indian Oil** | Category replace |
 | Pharmacy | **Apollo Pharmacy** | |
 
-**Parking hold** (easy to mess up in rehearsal): after Chai Point, "I need parking too" reports no lot and **keeps the pin**. Blue Tokai doesn't appear until I say **Another one**.
+**Parking hold** (we rehearse this): after Chai Point, *"I need parking too"* reports no lot and **keeps the pin**. Blue Tokai doesn't appear until **Another one**.
 
 ---
 
-## Proof I invite you to reproduce
+## How we map to the judge rubric
 
-### Watch the fence cockpit live
+| Bucket | Points | What we demonstrate | Where |
+|---|---:|---|---|
+| Voice necessity | 25 | Mission created and revised entirely by speech — never touch the map | Browser demo, beats 1–9 |
+| Hard voice engineering | 25 | VAD barrier, dual counters, stale tool rejection | **Fence cockpit** — `BARRIER_CLOSED`, `OBSOLETE`, `stale ≥ 1` |
+| Rime experience | 20 | Coda / astra, HTTP PCM 24 kHz, every spoken line | Provider badges + audible responses |
+| Evidence | 20 | Reproducible fence proof, 131 tests | `mid_drive.evidence` + pytest |
+| Demo clarity | 10 | One corridor, deterministic fixture, honest wording | 3:30 cue card above |
 
-During steps 3 and 7, I'm not asking anyone to trust latency numbers I didn't measure. I'm showing **application state** — the same thing that gates Rime input.
+---
 
-### Run my evidence CLI
+## Proof you can reproduce
+
+### 1 · Watch the fence cockpit
+
+During beats 3 and 7, we're not asking anyone to trust latency numbers we didn't measure. We're showing **application state** — the same gate that controls Rime input.
+
+### 2 · Run our evidence CLI
 
 ```bash
 cd apps/agent
 uv run python -m mid_drive.evidence
 ```
 
-Expected output:
+Expected:
 
 ```json
 { "rounds": 3, "stale_admissions": 0, "stale_rejects": 3 }
@@ -284,7 +330,7 @@ Expected output:
 
 Non-zero `stale_admissions` is a hard fail — the command exits with an error.
 
-### Run the full test suite
+### 3 · Run the full test suite
 
 ```bash
 cd apps/agent
@@ -295,32 +341,32 @@ uv run pytest
 
 ---
 
-## What I won't oversell
+## What we won't oversell
 
-I'm precise here because unverified performance numbers earn zero credit in the brief.
+We're precise here because unverified performance numbers earn zero credit in the brief.
 
-- Residual audio can linger in WebRTC/browser buffers after interrupt — not magic instant silence
-- HUD ack/barrier ms are **server-event** timestamps, not acoustic p95
+- Residual audio can linger in WebRTC/browser buffers after interrupt — not instantaneous silence
+- HUD ack/barrier ms are **server-event** timestamps, not measured acoustic p95
 - Parking comes from OSM amenity **tags**, not live lot occupancy
 - Toll avoidance is a route **preference**, not a guarantee
-- My phrase grammar covers the judged script; wild paraphrase may miss
+- Our phrase grammar covers the judged script; free-form paraphrase may miss
 - `GEO_MODE=live` depends on public API rate limits and real-world latency
 
 ---
 
-## When things break — what I see and what I do
+## When things break
 
-| Failure | What I experience | Fix |
+| Failure | What you'll see | Fix |
 |---|---|---|
 | Rime HTTP error / bad PCM | Utterance fails; logged; no silent provider swap | Retry once in `SafeRimeTTS`; re-run preflight |
 | ElevenLabs STT down | Turns stop committing | Check `ELEVEN_API_KEY` and quota |
 | Azure unreachable | Judged path unaffected (`NLU_MODE=rules`) | Optional — ignore for demo |
 | Agent not registered | "Start drive" times out (~20 s) | Restart worker; free port **8081** |
 | Stale tool returns | Cockpit shows `OBSOLETE`; never spoken as current | Working as designed |
-| Unsupported phrasing | Rime asks me to rephrase | Stick to cue-card patterns |
+| Unsupported phrasing | Rime asks to rephrase | Use cue-card patterns |
 | Live geo timeout | "Still searching" / retry | Fall back to `fixture` |
 
-I never commit `.env`, key screenshots, or demo recordings with secrets in them.
+We never commit `.env`, key screenshots, or demo recordings containing secrets.
 
 ---
 
@@ -331,12 +377,12 @@ apps/
   agent/     LiveKit worker — SessionActor, fence, NLU, Rime, evidence CLI
   web/       Next.js cockpit — map, CockpitHUD, provider badges
 fixtures/
-  gurgaon-delhi-v1.json   my Cyber Hub → CP corridor + shop picks
+  gurgaon-delhi-v1.json   Cyber Hub → Connaught Place corridor + shop picks
 scripts/
-  dev-livekit.sh          local LiveKit
-  write_env.py            optional .env scaffolder
+  dev-livekit.sh          local LiveKit server
+  write_env.py            optional .env scaffolder (local only)
 RIME_EVIDENCE.md          hard claim · acceptance test · repeatable proof
-.env.example              placeholders only
+.env.example              placeholders only — copy to .env
 ```
 
 ---
@@ -357,7 +403,8 @@ RIME_EVIDENCE.md          hard claim · acceptance test · repeatable proof
 ---
 
 <p align="center">
-  <strong>Mid-Drive</strong><br/>
-  Driving makes the problem obvious. The output barrier, mission versioning,<br/>
-  and stale-result fence are what I built to solve it — with Rime as the voice you'll actually hear.
+  <strong>Mid-Drive</strong><br/><br/>
+  Driving makes the problem obvious.<br/>
+  The output barrier, mission versioning, and stale-result fence are what we built to solve it —<br/>
+  with <strong>Rime</strong> as the voice you'll actually hear on the road.
 </p>
