@@ -70,5 +70,9 @@ input {
 }
 
 .barrier-flash {
-  box-shadow: inset 0 0 0 1px rgba(240, 113, 103, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(240, 113, 103, 0.55), 0 0 28px rgba(240, 113, 103, 0.18);
+}
+
+.stale-hot {
+  box-shadow: inset 0 0 0 1px rgba(240, 113, 103, 0.28);
 }

@@ -27,6 +27,7 @@ testpaths = ["tests"]
 [project.scripts]
 mid-drive = "mid_drive.main:main"
 mid-drive-preflight = "mid_drive.preflight:main"
+mid-drive-evidence = "mid_drive.evidence:main"
 
 [build-system]
 requires = ["uv_build>=0.9.18,<0.10.0"]

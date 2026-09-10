@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from typing import Any
 
+from .llm_revision import (
+    parse_turn_with_llm,
+    prefer_rules_over_llm,
+    residual_parse,
+    rules_confident,
+)
 from .models import MissionConstraints, MissionPatch, PlaceCandidate, SessionPrefs
 from .revision import parse_turn
 
@@ -32,8 +39,10 @@ _GENERIC = {
 }
 
 
-def nlu_mode(_settings: Any) -> str:
-    """Product NLU is the phrase parser. Azure is not on the turn path."""
+def nlu_mode(settings: Any) -> str:
+    raw = getattr(settings, "nlu_mode", None) if settings else None
+    if raw in {"hybrid", "azure"}:
+        return raw
     return "rules"
 
 
@@ -101,8 +110,30 @@ async def resolve_patch(
     *,
     offered: list[PlaceCandidate] | None = None,
     prefs: SessionPrefs | None = None,
-) -> tuple[MissionPatch, str]:
-    """Rules parser only. `settings` / `prefs` kept so call sites stay stable."""
-    del settings, prefs
-    patch = parse_turn(text, current)
-    return sanitize_patch(patch, text, offered), "rules"
+) -> tuple[MissionPatch, str, int]:
+    """Rules first. Azure only when the mode asks for it or the grammar is weak."""
+    del prefs
+    started = time.perf_counter()
+    rules = sanitize_patch(parse_turn(text, current), text, offered)
+    mode = nlu_mode(settings)
+
+    if mode == "rules":
+        return rules, "rules", int((time.perf_counter() - started) * 1000)
+
+    need_llm = mode == "azure" or residual_parse(text, rules)
+    if mode == "hybrid" and rules_confident(rules) and not need_llm:
+        return rules, "rules", int((time.perf_counter() - started) * 1000)
+
+    try:
+        llm_patch = await parse_turn_with_llm(settings, text, current)
+    except Exception as exc:
+        logger.warning("azure resolve failed, using rules: %s", exc)
+        llm_patch = None
+
+    if llm_patch is None or prefer_rules_over_llm(rules, llm_patch):
+        source = "rules"
+        patch = rules
+    else:
+        source = "azure"
+        patch = sanitize_patch(llm_patch, text, offered)
+    return patch, source, int((time.perf_counter() - started) * 1000)

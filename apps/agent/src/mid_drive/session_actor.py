@@ -7,6 +7,7 @@ from typing import Any
 from livekit.agents.voice.speech_handle import SpeechHandle
 
 from .models import (
+    CockpitStats,
     MissionConstraints,
     MissionSnapshot,
     MissionStatus,
@@ -58,6 +59,11 @@ class SessionActor:
         self.protect_speech = False
         self.speech_started_at = 0.0
         self.pending_speech: str | None = None
+        self.cockpit = CockpitStats()
+        self.search_inflight = False
+        self.search_version = 0
+        self.search_delay_s = 0.0
+        self.search_request_id = ""
 
     def snapshot(self) -> MissionSnapshot:
         return MissionSnapshot(
@@ -78,6 +84,7 @@ class SessionActor:
             last_barrier_ms=self.last_barrier_ms,
             route=self.cached_route,
             prefs=self.prefs,
+            cockpit=self.cockpit.model_copy(),
         )
 
     def note_prefs(self, parking: bool | None, avoid_tolls: bool | None) -> None:
@@ -114,6 +121,7 @@ class SessionActor:
             self.speech_interrupted = True
         self.last_barrier_ms = int((time.perf_counter() - started) * 1000)
         self._barrier_started = started
+        self.cockpit.barrier_count += 1
         return self.snapshot()
 
     def issue_token(self, request_kind: str) -> WorkToken:
@@ -216,7 +224,35 @@ class SessionActor:
         return chosen
 
     def inquire(self, kind) -> str:
-        return format_inquire(kind, self.constraints, self.selected, self.alternatives, self.cached_route)
+        return format_inquire(
+            kind,
+            self.constraints,
+            self.selected,
+            self.alternatives,
+            self.cached_route,
+            search_inflight=self.search_inflight,
+            search_version=self.search_version,
+            search_delay_s=self.search_delay_s,
+        )
+
+    def mark_search(self, delay_s: float, request_id: str = "") -> None:
+        self.search_inflight = True
+        self.search_version = self.mission_version
+        self.search_delay_s = delay_s
+        self.search_request_id = request_id
+        self.cockpit.searching = True
+        self.cockpit.search_delay_s = delay_s
+
+    def clear_search(self) -> None:
+        self.search_inflight = False
+        self.search_delay_s = 0.0
+        self.search_request_id = ""
+        self.cockpit.searching = False
+        self.cockpit.search_delay_s = 0.0
+
+    def clear_search_for(self, request_id: str) -> None:
+        if request_id and self.search_request_id == request_id:
+            self.clear_search()
 
     def reject_selected(self) -> None:
         selected = self.selected
@@ -353,6 +389,24 @@ class SessionActor:
         if cancelled:
             self.search_cancelled = True
         return cancelled
+
+    def note_nlu(self, source: str, operation: str, latency_ms: int) -> None:
+        self.cockpit.last_nlu_source = source
+        self.cockpit.last_operation = operation
+        self.cockpit.last_nlu_ms = latency_ms
+
+    def note_ack(self, latency_ms: int) -> None:
+        self.cockpit.last_ack_ms = max(0, latency_ms)
+
+    def note_stale(self, kind: str, version: int, epoch: int) -> None:
+        self.cockpit.stale_rejects += 1
+        self.cockpit.last_stale_kind = kind
+        self.cockpit.last_stale_version = version
+        self.cockpit.last_stale_epoch = epoch
+        self.cockpit.last_stale_label = "OBSOLETE"
+
+    def note_accepted(self) -> None:
+        self.cockpit.accepted_results += 1
 
     def end_session(self) -> None:
         self.output_gate = OutputGate.CLOSED_FOR_END

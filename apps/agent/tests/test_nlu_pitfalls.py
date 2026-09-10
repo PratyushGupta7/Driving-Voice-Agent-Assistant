@@ -57,7 +57,7 @@ def _third() -> PlaceCandidate:
     )
 
 
-# docs/SCENARIOS.md lines the demo actually speaks.
+# Demo voice lines the README cue card actually speaks.
 SCENARIO_TURNS: list[tuple[str, str, bool]] = [
     ("Find a coffee shop near my route.", "create", True),
     ("Wait, I need parking too.", "add", True),

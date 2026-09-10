@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import random
 from types import SimpleNamespace
 
@@ -118,6 +119,29 @@ async def test_stale_after_delay_skips_execute_plan(tmp_path, monkeypatch) -> No
     assert run.route_decision is FenceDecision.STALE_REJECTED
     assert run.place_decision is FenceDecision.STALE_REJECTED
     assert run.spoken is None
+
+
+@pytest.mark.asyncio
+async def test_cancelled_delay_still_fences_obsolete(tmp_path) -> None:
+    actor, fence = await _fence(tmp_path)
+    actor.on_user_speaking()
+    actor.commit_revision(_coffee(parking_required=True), "active", True)
+    route = actor.issue_token("route")
+    place = actor.issue_token("place_search")
+    orch = PlaceSearchOrchestrator(
+        fence,
+        SimpleNamespace(geo_mode="fixture", fixture_v2_delay_s=2.0),
+    )
+    task = asyncio.create_task(orch.plan(route, place, _coffee(parking_required=True), set()))
+    await asyncio.sleep(0.05)
+    actor.on_user_speaking()
+    actor.commit_revision(_coffee(parking_required=True, avoid_tolls=True), "active", True)
+    task.cancel()
+    run = await task
+    assert run.route_decision is FenceDecision.STALE_REJECTED
+    assert run.place_decision is FenceDecision.STALE_REJECTED
+    assert run.spoken is None
+    assert actor.selected is None
 
 
 @pytest.mark.asyncio

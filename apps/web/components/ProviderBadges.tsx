@@ -9,6 +9,7 @@ const DEFAULTS: ProviderMap = {
   tts_transport: "http-pcm",
   llm: "Azure OpenAI",
   llm_model: "gpt-4.1-mini",
+  nlu: "rules",
   geo: "fixture",
 };
 
@@ -18,6 +19,7 @@ export function ProviderBadges({ providers }: { providers: ProviderMap }) {
     { k: "STT", v: `${p.stt} · ${p.stt_model}` },
     { k: "TTS", v: `${p.tts} ${p.tts_model} · ${p.tts_speaker}` },
     { k: "LLM", v: `${p.llm} · ${p.llm_model}` },
+    { k: "NLU", v: p.nlu || "rules" },
     { k: "GEO", v: p.geo === "live" ? "OSM · OSRM · Overpass" : "fixture corridor" },
   ];
 

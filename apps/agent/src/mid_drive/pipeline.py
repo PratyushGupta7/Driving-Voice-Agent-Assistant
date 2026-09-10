@@ -18,6 +18,15 @@ DOMAIN_KEYTERMS = [
     "tolls",
     "pharmacy",
     "coffee",
+    "Chai Point",
+    "Starbucks",
+    "Blue Tokai",
+    "Third Wave",
+    "Apollo",
+    "Indian Oil",
+    "Cyber Hub",
+    "Connaught Place",
+    "India Gate",
 ]
 
 

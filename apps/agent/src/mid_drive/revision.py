@@ -11,17 +11,19 @@ _CANCEL_MISSION = re.compile(
 )
 _PARKING_ON = re.compile(
     r"\b((it )?needs parking|parking required|with parking|has to have parking|"
-    r"need(?:s)? parking|need(?:s)? a (parking )?lot|parking chahiye|"
-    r"parking too|parking as well|also (need )?parking|require[sd]? parking)\b",
+    r"need(?:s)? parking|need(?:s)? a (parking )?lot|want parking|must have parking|"
+    r"parking chahiye|parking too|parking as well|also (need )?parking|"
+    r"and parking|also a lot|require[sd]? parking)\b",
     re.I,
 )
 _PARKING_OFF = re.compile(
     r"\b(no parking|without parking|parking not required|don't need parking|dont need parking|"
+    r"don'?t want parking|do not want parking|"
     r"drop (the )?parking|parking is optional|don't need a lot)\b",
     re.I,
 )
 _TOLLS_OFF = re.compile(
-    r"\b(avoid (the )?tolls?|no tolls?|without (a )?tolls?|toll[- ]roads? too|"
+    r"\b(avoid (the )?tolls?|no tolls?|without (?:a |any )?tolls?|toll[- ]roads? too|"
     r"toll[- ]free|non[- ]toll)\b",
     re.I,
 )
@@ -30,28 +32,48 @@ _TOLLS_ON = re.compile(
     re.I,
 )
 _DETOUR = re.compile(r"\b(?:(?:max(?:imum)?|under|within)\s+)?(\d{1,2})\s*(?:min|mins|minutes)\b", re.I)
+_DETOUR_WORD = re.compile(
+    r"\b(?:(?:max(?:imum)?|under|within)\s+)?(one|two|three|four|five|six|seven|eight|nine|ten)\s*(?:min|mins|minutes)\b",
+    re.I,
+)
+_WORD_MINUTES = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+}
 _CLOSER = re.compile(r"\b(too far|shorter detour|less of a detour)\b", re.I)
 _CLOSER_BARE = re.compile(r"\b(closer|nearer)\b", re.I)
-_COFFEE = re.compile(r"\b(coffee|caf[eé]|barista|espresso|chai)\b", re.I)
+_COFFEE = re.compile(r"\b(coffee|caf[eé]|barista|espresso|chai|caffeine|latte|cappuccino)\b", re.I)
+_THIRSTY = re.compile(r"\b(i(?:'m| am) thirsty|need (?:a )?(?:drink|caffeine)|need caffeine)\b", re.I)
 _FUEL = re.compile(
     r"\b(fuel|gas station|petrol pump|petrol station|filling station|petrol|diesel|gas)\b",
     re.I,
 )
+_LOW_FUEL = re.compile(r"\b(low on (?:gas|fuel|petrol)|tank is low|running (?:on )?empty)\b", re.I)
 _PHARMACY = re.compile(r"\b(pharmacy|chemist|drugstore|medicine|medical store)\b", re.I)
+_HUNGRY = re.compile(r"\b(i(?:'m| am) hungry|need food|something to eat)\b", re.I)
 _BACKCHANNEL = re.compile(r"^(uh-?huh|mm-?hm+|yeah|yep|yup|ok(?:ay)?|right|sure|acha|accha)\.?$", re.I)
 _FIND = re.compile(
-    r"\b(find|look for|search|need|want|get|stop for|pull over for|sign a)\b",
+    r"\b(find|look for|search|need|want|get|stop for|pull over(?: for)?|sign a|grab)\b",
     re.I,
 )
 _CONFIRM = re.compile(
     r"\b(keep (this|that|it)|that (one )?works|sounds good|we('ll| will) take (it|this|that)|"
     r"take that one|go with (this|that)|yes,? keep|first one is fine|we'll take this|"
-    r"yeh wala|this one works)\b",
+    r"yeh wala|this one works|this is fine|that'?s fine|works for me|that'?s perfect)\b",
     re.I,
 )
 _NEXT = re.compile(
     r"\b(another one|another option|not that|somewhere else|next one|different (one|place)|"
-    r"skip (this|that)|try another|koi aur)\b",
+    r"skip (this|that|it)|try another|koi aur|"
+    r"don'?t want (that|this)(?: one)?|not this one)\b",
     re.I,
 )
 _ALONG_ROUTE = re.compile(
@@ -87,11 +109,32 @@ _SELECT_NAME = re.compile(
     re.I,
 )
 _CALLED = re.compile(r"\b(?:called|named)\s+(.+)$", re.I)
-_INQUIRE_WHY = re.compile(r"\b(why (this|that)|why did you pick|why this one)\b", re.I)
-_INQUIRE_ETA = re.compile(r"\b(how (much )?(extra |more )?time|how long (a )?detour|extra minutes)\b", re.I)
+_INQUIRE_WHY = re.compile(
+    r"\b(why (this|that)|why did you pick|why this one|why pick|"
+    r"which one did you (pick|choose)|tell me about (it|this|that))\b",
+    re.I,
+)
+_INQUIRE_ETA = re.compile(
+    r"\b(how (much )?(extra |more )?time|how long (a )?detour|extra minutes|"
+    r"how far(?: is it| out of the way)?)\b",
+    re.I,
+)
 _INQUIRE_PARK = re.compile(
     r"\b(does (?:it|[a-z0-9 .'-]{1,32}) have parking|any parking|parking there|"
-    r"have parking|is there parking)\b",
+    r"have parking|is there parking|what about parking|any lot)\b",
+    re.I,
+)
+_INQUIRE_HELP = re.compile(
+    r"\b(what can you do|how does this work|what do you (do|support))\b",
+    re.I,
+)
+_INQUIRE_STATUS = re.compile(
+    r"\b(where are we|what'?s (our |the )?status|how'?s the drive|mission status)\b",
+    re.I,
+)
+_INQUIRE_WAIT = re.compile(
+    r"\b(what'?s taking|taking so long|still looking|still searching|any update|"
+    r"you still (looking|searching))\b",
     re.I,
 )
 _INQUIRE_OTHER = re.compile(r"\b(what('s| is) the other|other option|what else)\b", re.I)
@@ -195,14 +238,38 @@ _STOP = {
     "don't",
     "drop",
     "lot",
+    "nearest",
+    "nearer",
+    "closest",
+    "quick",
+    "nearby",
+    "good",
+    "best",
+    "cheap",
+    "some",
+    "any",
+    "drink",
+    "drinks",
+    "help",
+    "please",
+    "perfect",
+    "caffeine",
+    "latte",
+    "cappuccino",
+    "thirsty",
+    "hungry",
+    "food",
+    "tank",
+    "empty",
+    "grab",
 }
 
 
 def _categories(text: str) -> list[str]:
     found: list[str] = []
-    if _COFFEE.search(text):
+    if _COFFEE.search(text) or _THIRSTY.search(text):
         found.append("coffee")
-    if _FUEL.search(text):
+    if _FUEL.search(text) or _LOW_FUEL.search(text):
         found.append("fuel")
     if _PHARMACY.search(text):
         found.append("pharmacy")
@@ -246,7 +313,15 @@ def _leftover_brand(text: str) -> str | None:
 
 def parse_turn(text: str, current: MissionConstraints | None) -> MissionPatch:
     """Deterministic revision parser. None-fields mean 'not mentioned'."""
-    cleaned = _clean(" ".join(text.strip().split()))
+    raw = " ".join(text.strip().split())
+    if not raw:
+        return MissionPatch(operation="unrelated")
+    # Filler strip removes "can you" / "could you". Match help on the raw line.
+    if _INQUIRE_HELP.search(raw):
+        return MissionPatch(operation="inquire", inquire_kind="help")
+    if _INQUIRE_STATUS.search(raw):
+        return MissionPatch(operation="inquire", inquire_kind="status")
+    cleaned = _clean(raw)
     if not cleaned:
         return MissionPatch(operation="unrelated")
     if _BACKCHANNEL.match(cleaned):
@@ -265,6 +340,8 @@ def parse_turn(text: str, current: MissionConstraints | None) -> MissionPatch:
         parking = True
 
     if current is not None:
+        if _INQUIRE_WAIT.search(raw) or _INQUIRE_WAIT.search(cleaned):
+            return MissionPatch(operation="inquire", inquire_kind="status")
         if _INQUIRE_WHY.search(cleaned):
             return MissionPatch(operation="inquire", inquire_kind="why")
         if _INQUIRE_ETA.search(cleaned):
@@ -337,6 +414,10 @@ def parse_turn(text: str, current: MissionConstraints | None) -> MissionPatch:
         detour_match = _DETOUR.search(cleaned)
         if detour_match:
             detour = int(detour_match.group(1))
+        else:
+            word_match = _DETOUR_WORD.search(cleaned)
+            if word_match:
+                detour = _WORD_MINUTES.get(word_match.group(1).lower())
 
     brand = None
     called = _CALLED.search(cleaned)
@@ -363,7 +444,7 @@ def parse_turn(text: str, current: MissionConstraints | None) -> MissionPatch:
         )
     )
     if not mentioned:
-        if _FIND.search(cleaned):
+        if _HUNGRY.search(cleaned) or _FIND.search(cleaned):
             return MissionPatch(
                 operation="ambiguous",
                 clarification_question="Coffee, fuel, or a pharmacy?",

@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 Category = Literal["coffee", "fuel", "pharmacy"]
 AmenityState = Literal["yes", "no", "unknown"]
 PreferAlong = Literal["start", "end"]
-InquireKind = Literal["why", "eta", "parking", "other", "compare", "hours", "where"]
+InquireKind = Literal["why", "eta", "parking", "other", "compare", "hours", "where", "help", "status"]
 PatchOp = Literal[
     "create",
     "add",
@@ -146,6 +146,24 @@ class VersionEntry(BaseModel):
     epoch: int
 
 
+class CockpitStats(BaseModel):
+    """Judge-facing counters. Never used as a correctness gate."""
+
+    stale_rejects: int = 0
+    accepted_results: int = 0
+    barrier_count: int = 0
+    last_ack_ms: int | None = None
+    last_nlu_ms: int | None = None
+    last_nlu_source: str = "rules"
+    last_operation: str | None = None
+    last_stale_kind: str | None = None
+    last_stale_version: int | None = None
+    last_stale_epoch: int | None = None
+    last_stale_label: str = "OBSOLETE"
+    searching: bool = False
+    search_delay_s: float = 0
+
+
 class OperationResult(BaseModel):
     token: WorkToken
     operation_id: str
@@ -176,6 +194,7 @@ class MissionSnapshot(BaseModel):
     last_barrier_ms: int | None = None
     route: RouteSnapshot | None = None
     prefs: SessionPrefs = Field(default_factory=SessionPrefs)
+    cockpit: CockpitStats = Field(default_factory=CockpitStats)
 
 
 @dataclass

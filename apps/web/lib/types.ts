@@ -75,6 +75,22 @@ export type VersionEntry = {
   epoch: number;
 };
 
+export type CockpitStats = {
+  stale_rejects?: number;
+  accepted_results?: number;
+  barrier_count?: number;
+  last_ack_ms?: number | null;
+  last_nlu_ms?: number | null;
+  last_nlu_source?: string;
+  last_operation?: string | null;
+  last_stale_kind?: string | null;
+  last_stale_version?: number | null;
+  last_stale_epoch?: number | null;
+  last_stale_label?: string;
+  searching?: boolean;
+  search_delay_s?: number;
+};
+
 export type MissionSnapshot = {
   session_id: string;
   mission_id: string | null;
@@ -90,6 +106,7 @@ export type MissionSnapshot = {
   last_revision?: string | null;
   last_barrier_ms?: number | null;
   route?: RouteSnapshot | null;
+  cockpit?: CockpitStats | null;
 };
 
 export type ToolRow = {

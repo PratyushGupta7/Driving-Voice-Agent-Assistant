@@ -34,7 +34,14 @@ _SHORT_DONE = re.compile(
     r"any parking|the second one|the first one|the third one|"
     r"where is (it|that)|which area|are they open|compare( them)?|"
     r"what('s| is) the other|other option|what else|what did you find|"
-    r"go with |yeh wala|koi aur|parking chahiye)\b",
+    r"go with |yeh wala|koi aur|parking chahiye|"
+    r"and parking|want parking|must have parking|skip it|"
+    r"this is fine|that'?s fine|works for me|how far is it|"
+    r"what about parking|what can you do|how'?s the drive|"
+    r"not this one|don'?t want that|without (any )?tolls|"
+    r"i('m| am) thirsty|low on (gas|fuel)|need caffeine|grab (a )?coffee|"
+    r"what'?s taking|still looking|still searching|any update|"
+    r"within (five|three|ten) minutes|i('m| am) hungry)\b",
     re.I,
 )
 _HANG_LAST = {

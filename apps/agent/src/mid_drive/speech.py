@@ -5,7 +5,13 @@ import re
 from .models import InquireKind, MissionConstraints, PlaceCandidate, RouteSnapshot, SessionPrefs
 
 GREETING = "I'm with you on the Gurgaon to Delhi drive. What do you need along the way?"
+SEARCH_HOLD = "I'll keep listening while that search runs."
 ECHO_HOLDOFF_S = 0.40
+
+_SPOKEN_NAME = {
+    "Blue Tokai Coffee Roasters": "Blue Tokai",
+    "Third Wave Coffee": "Third Wave",
+}
 
 _TTS_JUNK = re.compile(r"[#*`>_\[\]{}|]+")
 _MULTI_SPACE = re.compile(r"\s+")
@@ -40,6 +46,11 @@ _SMALL = {
 
 def spoken_number(value: int) -> str:
     return _SMALL.get(value, str(value))
+
+
+def spoken_place(name: str) -> str:
+    """Shorter Rime wording. Display names on the map stay unchanged."""
+    return _SPOKEN_NAME.get(name or "", name)
 
 
 def sanitize_tts_text(text: str) -> str:
@@ -87,7 +98,7 @@ def format_candidate(
     candidate: PlaceCandidate,
     alternatives: list[PlaceCandidate] | None = None,
 ) -> str:
-    bits = [f"{candidate.name} in {candidate.area} is on the way."]
+    bits = [f"{spoken_place(candidate.name)} in {candidate.area} is on the way."]
     if candidate.verified and candidate.detour_minutes:
         bits.append(f"The extra time is about {spoken_number(candidate.detour_minutes)} minutes.")
     elif candidate.reasons:
@@ -108,12 +119,13 @@ def format_candidate(
     alts = alternatives or []
     if alts:
         other = alts[0]
+        other_name = spoken_place(other.name)
         if constraints.parking_required and other.parking == "yes":
-            bits.append(f"I also have {other.name}, and that one reports a lot too.")
+            bits.append(f"I also have {other_name}, and that one reports a lot too.")
         elif constraints.parking_required and other.parking == "no":
-            bits.append(f"I also have {other.name}, but that one does not report a lot.")
+            bits.append(f"I also have {other_name}, but that one does not report a lot.")
         else:
-            bits.append(f"I also have {other.name}.")
+            bits.append(f"I also have {other_name}.")
     bits.append("Should I keep this one?")
     return " ".join(bits)
 
@@ -137,55 +149,84 @@ def format_inquire(
     selected: PlaceCandidate | None,
     alternatives: list[PlaceCandidate],
     route: RouteSnapshot | None,
+    *,
+    search_inflight: bool = False,
+    search_version: int = 0,
+    search_delay_s: float = 0,
 ) -> str:
+    if kind == "help":
+        return (
+            "I can find coffee, fuel, or a pharmacy on this Gurgaon to Delhi drive. "
+            "You can require parking, avoid tolls, pick another option, or cancel."
+        )
+    if kind == "status":
+        if search_inflight:
+            if search_delay_s >= 2:
+                extra = f" Version {search_version} is on an {spoken_number(int(search_delay_s))} second delay."
+            elif search_version:
+                extra = f" That is version {search_version}."
+            else:
+                extra = ""
+            return (
+                f"Still searching.{extra} You can change parking or tolls. "
+                "I will drop the old result if you do."
+            )
+        if selected:
+            return f"The current stop is {spoken_place(selected.name)} in {selected.area}."
+        if constraints:
+            return f"Still looking for {constraints.category} on the way."
+        return "No stop in play yet. Ask for coffee, fuel, or a pharmacy."
     if selected is None and kind != "compare":
         return "I do not have a place in play yet."
     if kind == "why" and selected:
+        name = spoken_place(selected.name)
         if selected.reasons:
-            return f"I picked {selected.name} because {selected.reasons[0]}."
-        return f"{selected.name} was the best match I could verify on this corridor."
+            return f"I picked {name} because {selected.reasons[0]}."
+        return f"{name} was the best match I could verify on this corridor."
     if kind == "eta" and selected:
         if selected.verified and selected.detour_minutes:
-            return f"The extra time for {selected.name} is about {spoken_number(selected.detour_minutes)} minutes."
+            return f"The extra time for {spoken_place(selected.name)} is about {spoken_number(selected.detour_minutes)} minutes."
         return "I do not have a verified extra time for this stop yet."
     if kind == "parking" and selected:
+        name = spoken_place(selected.name)
         if selected.parking == "yes":
-            line = f"{selected.name} reports a parking lot. That is not live occupancy."
+            line = f"{name} reports a parking lot. That is not live occupancy."
         elif selected.parking == "no":
-            line = f"{selected.name} is tagged as having no parking lot."
+            line = f"{name} is tagged as having no parking lot."
         else:
-            line = f"I do not have a parking tag for {selected.name}."
+            line = f"I do not have a parking tag for {name}."
         if alternatives:
             other = alternatives[0]
+            other_name = spoken_place(other.name)
             if other.parking == "yes":
-                line += f" {other.name} reports a lot as well."
+                line += f" {other_name} reports a lot as well."
             elif other.parking == "no":
-                line += f" {other.name} is tagged as having no lot."
+                line += f" {other_name} is tagged as having no lot."
         return line
     if kind == "hours" and selected:
         if selected.opening_hours:
             return f"OpenStreetMap lists hours as {selected.opening_hours}."
-        return f"I do not have hours for {selected.name}."
+        return f"I do not have hours for {spoken_place(selected.name)}."
     if kind == "where" and selected:
-        return f"{selected.name} is in {selected.area}."
+        return f"{spoken_place(selected.name)} is in {selected.area}."
     if kind == "other":
         if alternatives:
             other = alternatives[0]
             extra = ""
             if other.verified and other.detour_minutes:
                 extra = f" About {spoken_number(other.detour_minutes)} extra minutes."
-            return f"The next option is {other.name} in {other.area}.{extra}"
+            return f"The next option is {spoken_place(other.name)} in {other.area}.{extra}"
         return "I do not have another accepted option. Say another one and I will search again."
     if kind == "compare":
         bits: list[str] = []
         if selected and alternatives:
-            left = selected
-            right = alternatives[0]
-            bits.append(f"{left.name} versus {right.name}.")
-            if left.detour_minutes is not None and right.detour_minutes is not None and left.verified and right.verified:
+            left = spoken_place(selected.name)
+            right = spoken_place(alternatives[0].name)
+            bits.append(f"{left} versus {right}.")
+            if selected.detour_minutes is not None and alternatives[0].detour_minutes is not None and selected.verified and alternatives[0].verified:
                 bits.append(
-                    f"{left.name} is about {spoken_number(left.detour_minutes)} extra minutes, "
-                    f"{right.name} about {spoken_number(right.detour_minutes)}."
+                    f"{left} is about {spoken_number(selected.detour_minutes)} extra minutes, "
+                    f"{right} about {spoken_number(alternatives[0].detour_minutes)}."
                 )
         if route and route.avoid_tolls and route.toll_compare_minutes:
             bits.append(

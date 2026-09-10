@@ -9,13 +9,25 @@ from .providers.plan import PlanOutcome, execute_plan
 from .result_fence import ResultFence
 
 
-def fixture_delay_seconds(mission_version: int, geo_mode: str = "fixture") -> float:
+def fixture_delay_seconds(
+    mission_version: int,
+    geo_mode: str = "fixture",
+    delay_s: float | None = None,
+) -> float:
     """Artificial delay only in fixture mode so v2 can lose a race on purpose."""
     if (geo_mode or "fixture").lower() != "fixture":
         return 0.0
     if mission_version == 2:
-        return 8.0
+        return 8.0 if delay_s is None else float(delay_s)
     return 0.0
+
+
+def delay_for_settings(settings, mission_version: int) -> float:
+    return fixture_delay_seconds(
+        mission_version,
+        getattr(settings, "geo_mode", "fixture"),
+        getattr(settings, "fixture_v2_delay_s", None),
+    )
 
 
 def _placeholder_outcome() -> PlanOutcome:
@@ -77,38 +89,39 @@ class PlaceSearchOrchestrator:
     ) -> PlanRun:
         await self._mark_started(route_token)
         await self._mark_started(place_token)
-        delay = fixture_delay_seconds(place_token.mission_version, self.settings.geo_mode)
+        delay = delay_for_settings(self.settings, place_token.mission_version)
         started = time.perf_counter()
-        if delay:
-            await asyncio.sleep(delay)
+        try:
+            if delay:
+                await asyncio.sleep(delay)
+            actor = self.fence.actor
+            stale_before_work = not actor.may_commit(place_token) and not actor.may_commit(route_token)
+            delay_ms = int((time.perf_counter() - started) * 1000)
+            if stale_before_work:
+                return await self._stale_run(
+                    route_token,
+                    place_token,
+                    delay_ms,
+                    "stale_before_plan",
+                )
 
-        actor = self.fence.actor
-        stale_before_work = not actor.may_commit(place_token) and not actor.may_commit(route_token)
-        delay_ms = int((time.perf_counter() - started) * 1000)
-        if stale_before_work:
-            outcome = _placeholder_outcome()
-            route_result = _result_for(
-                route_token, provider="skipped", delay_ms=delay_ms, error="stale_before_plan"
+            outcome = await execute_plan(
+                self.settings,
+                constraints,
+                skip_ids,
+                reuse_route=actor.reuse_route(constraints),
+                reuse_places=actor.reuse_places(constraints),
             )
-            place_result = _result_for(
-                place_token, provider="skipped", delay_ms=delay_ms, error="stale_before_plan"
-            )
-            return PlanRun(
-                route_decision=await self.fence.commit(route_result),
-                place_decision=await self.fence.commit(place_result),
-                spoken=None,
-                route_result=route_result,
-                place_result=place_result,
-                outcome=outcome,
+        except asyncio.CancelledError:
+            # Cancellation is best-effort. The fence still rejects this token so a
+            # late v2 row can show OBSOLETE in the judged stress case.
+            return await self._stale_run(
+                route_token,
+                place_token,
+                int((time.perf_counter() - started) * 1000),
+                "cancelled_after_barrier",
             )
 
-        outcome = await execute_plan(
-            self.settings,
-            constraints,
-            skip_ids,
-            reuse_route=actor.reuse_route(constraints),
-            reuse_places=actor.reuse_places(constraints),
-        )
         delay_ms = int((time.perf_counter() - started) * 1000)
 
         route_result = OperationResult(
@@ -146,6 +159,25 @@ class PlaceSearchOrchestrator:
             outcome=outcome,
         )
 
+    async def _stale_run(
+        self,
+        route_token: WorkToken,
+        place_token: WorkToken,
+        delay_ms: int,
+        error: str,
+    ) -> PlanRun:
+        outcome = _placeholder_outcome()
+        route_result = _result_for(route_token, provider="skipped", delay_ms=delay_ms, error=error)
+        place_result = _result_for(place_token, provider="skipped", delay_ms=delay_ms, error=error)
+        return PlanRun(
+            route_decision=await asyncio.shield(self.fence.commit(route_result)),
+            place_decision=await asyncio.shield(self.fence.commit(place_result)),
+            spoken=None,
+            route_result=route_result,
+            place_result=place_result,
+            outcome=outcome,
+        )
+
     async def search(
         self,
         token: WorkToken,
@@ -154,26 +186,35 @@ class PlaceSearchOrchestrator:
     ) -> tuple[FenceDecision, str | None, OperationResult]:
         """Compat wrapper: fence the real place token only. Do not invent a route token."""
         await self._mark_started(token)
-        delay = fixture_delay_seconds(token.mission_version, self.settings.geo_mode)
+        delay = delay_for_settings(self.settings, token.mission_version)
         started = time.perf_counter()
-        if delay:
-            await asyncio.sleep(delay)
-        actor = self.fence.actor
-        if not actor.may_commit(token):
+        try:
+            if delay:
+                await asyncio.sleep(delay)
+            actor = self.fence.actor
+            if not actor.may_commit(token):
+                result = _result_for(
+                    token,
+                    provider="skipped",
+                    delay_ms=int((time.perf_counter() - started) * 1000),
+                    error="stale_before_plan",
+                )
+                return await asyncio.shield(self.fence.commit(result)), None, result
+            outcome = await execute_plan(
+                self.settings,
+                constraints,
+                skip_ids,
+                reuse_route=actor.reuse_route(constraints),
+                reuse_places=actor.reuse_places(constraints),
+            )
+        except asyncio.CancelledError:
             result = _result_for(
                 token,
                 provider="skipped",
                 delay_ms=int((time.perf_counter() - started) * 1000),
-                error="stale_before_plan",
+                error="cancelled_after_barrier",
             )
-            return await self.fence.commit(result), None, result
-        outcome = await execute_plan(
-            self.settings,
-            constraints,
-            skip_ids,
-            reuse_route=actor.reuse_route(constraints),
-            reuse_places=actor.reuse_places(constraints),
-        )
+            return await asyncio.shield(self.fence.commit(result)), None, result
         result = OperationResult(
             token=token,
             operation_id=token.request_id,

@@ -11,12 +11,14 @@ import {
 import { ConnectionState, RoomEvent } from "livekit-client";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CockpitHUD } from "@/components/CockpitHUD";
 import { MissionPanel } from "@/components/MissionPanel";
 import { TalkControl } from "@/components/TalkControl";
 import { ProviderBadges } from "@/components/ProviderBadges";
 import { ToolTimeline } from "@/components/ToolTimeline";
 import type {
   AgentEvent,
+  CockpitStats,
   MissionSnapshot,
   PlaceCandidate,
   ProviderMap,
@@ -33,8 +35,9 @@ const RouteMap = dynamic(() => import("@/components/RouteMap").then((mod) => mod
 const AGENT_JOIN_TIMEOUT_MS = 20_000;
 
 function statusTone(value: string): string {
-  if (value === "speaking" || value === "LIVE") return "text-[#7ddec5]";
-  if (value === "thinking" || value === "connecting") return "text-[#e8a14a]";
+  if (value === "BARRIER_CLOSED" || value === "OBSOLETE") return "text-[#f07167]";
+  if (value === "speaking" || value === "LIVE" || value === "ACTIVE") return "text-[#7ddec5]";
+  if (value === "thinking" || value === "connecting" || value === "SEARCHING") return "text-[#e8a14a]";
   if (value.includes("error") || value === "failed") return "text-[#f07167]";
   return "text-[#cfc6b8]";
 }
@@ -60,6 +63,7 @@ function asSnapshot(payload: Record<string, unknown>): MissionSnapshot | null {
     last_revision: payload.last_revision ? String(payload.last_revision) : null,
     last_barrier_ms: payload.last_barrier_ms != null ? Number(payload.last_barrier_ms) : null,
     route: (payload.route as MissionSnapshot["route"]) ?? null,
+    cockpit: (payload.cockpit as MissionSnapshot["cockpit"]) ?? null,
   };
 }
 
@@ -81,6 +85,7 @@ function SessionInterior({
   const [alternatives, setAlternatives] = useState<PlaceCandidate[]>([]);
   const [agentPresent, setAgentPresent] = useState(false);
   const [releaseTick, setReleaseTick] = useState(0);
+  const [cockpit, setCockpit] = useState<CockpitStats | null>(null);
   const seen = useRef(new Set<string>());
 
   useEffect(() => {
@@ -93,6 +98,7 @@ function SessionInterior({
       if (agentAttributes["tts.speaker"]) fromAttrs.tts_speaker = agentAttributes["tts.speaker"];
       if (agentAttributes["llm.provider"]) fromAttrs.llm = agentAttributes["llm.provider"];
       if (agentAttributes["llm.model"]) fromAttrs.llm_model = agentAttributes["llm.model"];
+      if (agentAttributes["nlu.mode"]) fromAttrs.nlu = agentAttributes["nlu.mode"];
       if (agentAttributes["geo.mode"]) fromAttrs.geo = agentAttributes["geo.mode"];
     }
     if (Object.keys(fromAttrs).length) onProviders(fromAttrs);
@@ -116,7 +122,10 @@ function SessionInterior({
         const event = JSON.parse(new TextDecoder().decode(payload)) as AgentEvent;
         setEvents((current) => [...current.slice(-80), event]);
         if (event.type === "user_state") {
-          setUserState(String(event.payload.new ?? "listening"));
+          setUserState(event.payload.barrier ? "BARRIER_CLOSED" : String(event.payload.new ?? "listening"));
+        }
+        if (event.type === "cockpit") {
+          setCockpit(event.payload as CockpitStats);
         }
         if (event.type === "session_started") {
           const providers = event.payload.providers as ProviderMap | undefined;
@@ -126,6 +135,7 @@ function SessionInterior({
           const next = asSnapshot(event.payload);
           if (next) {
             setSnapshot(next);
+            if (next.cockpit) setCockpit(next.cockpit);
             if (next.alternatives?.length) setAlternatives(next.alternatives);
             else if (!next.selected) setAlternatives([]);
             if (next.route?.geometry?.length) setCorridor(next.route);
@@ -174,6 +184,9 @@ function SessionInterior({
               ...current.slice(-39),
               { id: `utterance-${event.seq}`, role: "agent", text, partial: false },
             ]);
+          }
+          if (event.payload.ack_ms != null) {
+            setCockpit((current) => ({ ...(current ?? {}), last_ack_ms: Number(event.payload.ack_ms) }));
           }
         }
         if (event.type === "transcript_partial" || event.type === "transcript_final") {
@@ -227,6 +240,14 @@ function SessionInterior({
     Boolean(latestPartial) && !(lastAgent && latestPartial && lastAgent.startsWith(latestPartial.trim()));
 
   return (
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <CockpitHUD
+        snapshot={snapshot}
+        cockpit={cockpit}
+        userState={userState}
+        agentState={state}
+        tools={tools}
+      />
     <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1.1fr)_minmax(280px,0.9fr)]">
       <div className="flex min-h-0 flex-col gap-4">
         <RouteMap
@@ -234,7 +255,7 @@ function SessionInterior({
           selected={snapshot?.selected ?? null}
           alternatives={snapshot?.selected ? alternatives : []}
         />
-      <section className={`panel flex flex-col rounded-3xl p-5 ${userState === "speaking" ? "barrier-flash" : ""}`}>
+      <section className={`panel flex flex-col rounded-3xl p-5 ${userState === "BARRIER_CLOSED" || userState === "speaking" ? "barrier-flash" : ""}`}>
         <div className="mb-6 flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-[#9a9388]">
           <span>Voice path</span>
           <span className={statusTone(state)}>{state}</span>
@@ -329,6 +350,7 @@ function SessionInterior({
         </section>
       </aside>
     </div>
+    </div>
   );
 }
 
@@ -406,18 +428,30 @@ export function VoiceSession() {
           </div>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">Mid-Drive</h1>
           <p className="mt-2 max-w-xl text-sm leading-6 text-[#9a9388]">
-            Full-duplex mission runtime. Interrupt mid-sentence. Stale tools cannot speak or move
-            the map. Rime is the only voice.
+            Hands-busy driver. Interrupt mid-sentence. Stale tools cannot speak or move the map.
+            Rime is the only voice.
           </p>
         </div>
         <ProviderBadges providers={providers} />
       </header>
 
       {!connected ? (
-        <main className="panel mx-auto mt-10 w-full max-w-xl rounded-[28px] p-8 text-center">
-          <p className="text-sm leading-6 text-[#cfc6b8]">
-            Allow the microphone, then start a drive. The agent worker must already be running so
-            Rime can greet you.
+        <main className="panel mx-auto mt-10 w-full max-w-2xl rounded-[28px] p-8 text-left">
+          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[#e8a14a]">
+            Official Rime stress case
+          </p>
+          <h2 className="mt-2 text-xl font-semibold text-[#f4efe6]">
+            Change the request while Rime is still talking or searching.
+          </h2>
+          <ul className="mt-4 space-y-2 text-sm leading-6 text-[#cfc6b8]">
+            <li>User: a driver on Cyber Hub → Connaught Place. Hands stay on the wheel.</li>
+            <li>Hard problem: interrupt, then fence the delayed old search so it cannot speak.</li>
+            <li>Rime Coda / astra is the only spoken output. Removing speech removes the product.</li>
+          </ul>
+          <p className="mt-4 text-sm leading-6 text-[#9a9388]">
+            Allow the microphone. The worker must already be running so Rime can greet you. Use
+            open mic for the interrupt. After “Another one,” say tolls before the eight-second
+            search finishes.
           </p>
           {micDenied ? (
             <p className="mt-4 text-sm text-[#f07167]">

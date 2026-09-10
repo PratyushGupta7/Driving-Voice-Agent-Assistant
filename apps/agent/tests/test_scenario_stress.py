@@ -5,6 +5,8 @@ Azure is not on this path. Default pytest must stay offline.
 
 from __future__ import annotations
 
+import asyncio
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -153,7 +155,7 @@ def _wire_fixture(controller: MissionController, session: FakeSession) -> list[s
     return names
 
 
-async def _controller(tmp_path, suffix: str) -> tuple[MissionController, DummyBus, FakeSession]:
+async def _controller(tmp_path, suffix: str, **settings_kw) -> tuple[MissionController, DummyBus, FakeSession]:
     actor = SessionActor(f"demo-{suffix}")
     repo = Repository(tmp_path / f"demo-{suffix}.db")
     await repo.init()
@@ -162,11 +164,20 @@ async def _controller(tmp_path, suffix: str) -> tuple[MissionController, DummyBu
         actor=actor,
         bus=bus,
         repository=repo,
-        settings=SimpleNamespace(geo_mode="fixture"),
+        settings=SimpleNamespace(geo_mode="fixture", nlu_mode="rules", **settings_kw),
     )
     session = FakeSession()
     controller.bind_session(session)
     return controller, bus, session
+
+
+async def _drain(controller: MissionController, timeout_s: float = 2.0) -> None:
+    deadline = time.perf_counter() + timeout_s
+    while time.perf_counter() < deadline:
+        if len(controller.background) == 0:
+            return
+        await asyncio.sleep(0.02)
+    raise AssertionError("background work did not finish")
 
 
 @pytest.mark.asyncio
@@ -245,3 +256,53 @@ async def test_judged_demo_path_ten_times(tmp_path) -> None:
         sources = [payload["source"] for kind, payload in bus.events if kind == "revision_parsed"]
         assert sources
         assert set(sources) == {"rules"}
+
+
+@pytest.mark.asyncio
+async def test_three_demo_scenes_live_orchestrator(tmp_path) -> None:
+    """Video path: coffee → parking hold → delayed v2 cancelled → v3 Starbucks + OBSOLETE."""
+    controller, bus, session = await _controller(tmp_path, "live-3", fixture_v2_delay_s=0.25)
+    actor = controller.actor
+
+    await controller.process_completed_turn("Find a coffee shop near my route.")
+    await _drain(controller)
+    assert actor.mission_version == 1
+    assert actor.selected is not None and actor.selected.name == "Chai Point"
+    assert "Looking for coffee on the way." in session.said
+    assert any("Chai Point" in said for said in session.said)
+
+    controller.on_user_speaking()
+    await controller.process_completed_turn("Wait, I need parking too.")
+    assert actor.mission_version == 2
+    assert actor.selected is not None and actor.selected.name == "Chai Point"
+    assert session.said[-1] == "Got it — parking required. Chai Point does not have a parking lot."
+    assert actor.cockpit.last_nlu_source == "rules"
+
+    await controller.process_completed_turn("Another one.")
+    assert actor.search_inflight is True
+    assert actor.search_delay_s == 0.25
+    assert "Looking for another." in session.said
+
+    controller.on_user_speaking()
+    await controller.process_completed_turn("Avoid toll roads too.")
+    await _drain(controller, timeout_s=2.5)
+    assert actor.mission_version == 3
+    assert actor.constraints is not None and actor.constraints.avoid_tolls is True
+    assert actor.selected is not None and actor.selected.name == "Starbucks"
+    assert actor.cockpit.stale_rejects >= 1
+    assert actor.cockpit.last_stale_version == 2
+    obsolete = [
+        payload
+        for kind, payload in bus.events
+        if kind == "tool_update" and payload.get("label") == "OBSOLETE"
+    ]
+    assert obsolete
+    assert all(payload.get("mission_version") == 2 for payload in obsolete)
+    assert not any(
+        kind == "tool_update"
+        and payload.get("decision") == "accepted"
+        and payload.get("name") == "Blue Tokai Coffee Roasters"
+        for kind, payload in bus.events
+    )
+    assert any("Starbucks" in said for said in session.said)
+    assert any("toll-avoiding" in said.lower() for said in session.said)

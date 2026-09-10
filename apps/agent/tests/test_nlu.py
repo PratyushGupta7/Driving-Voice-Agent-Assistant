@@ -72,7 +72,7 @@ async def test_resolve_patch_is_rules_even_if_azure_would_differ(monkeypatch) ->
     monkeypatch.setattr("mid_drive.nlu.parse_turn", lambda text, current: parse_turn(text, current))
     monkeypatch.setattr("mid_drive.llm_revision.parse_turn_with_llm", fake_llm)
     current = MissionConstraints(category="coffee")
-    patch, source = await resolve_patch(
+    patch, source, latency_ms = await resolve_patch(
         SimpleNamespace(nlu_mode="llm_first"),
         "Wait, I need parking too.",
         current,
@@ -81,3 +81,4 @@ async def test_resolve_patch_is_rules_even_if_azure_would_differ(monkeypatch) ->
     assert source == "rules"
     assert patch.operation == "add"
     assert patch.parking_required is True
+    assert latency_ms >= 0

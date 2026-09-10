@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     azure_openai_deployment: str = "gpt-4.1-mini"
     azure_openai_api_version: str = "2025-01-01-preview"
 
+    nlu_mode: str = "rules"
+    azure_speak: bool = False
+    azure_nlu_timeout_s: float = 0.8
+    azure_speak_timeout_s: float = 0.9
+    fixture_v2_delay_s: float = 8.0
+
     geo_mode: str = "fixture"
     nominatim_url: str = "https://nominatim.openstreetmap.org"
     osrm_url: str = "https://router.project-osrm.org"
@@ -72,7 +78,7 @@ class Settings(BaseSettings):
             "tts_sample_rate": str(self.rime_sample_rate),
             "llm": "Azure OpenAI",
             "llm_model": self.azure_openai_deployment,
-            "nlu": "rules",
+            "nlu": self.nlu_mode,
             "geo": self.geo_mode,
         }
 

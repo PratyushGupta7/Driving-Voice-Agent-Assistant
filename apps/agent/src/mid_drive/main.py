@@ -208,6 +208,7 @@ async def mid_drive(ctx: JobContext) -> None:
             "tts.transport": labels["tts_transport"],
             "llm.provider": labels["llm"],
             "llm.model": labels["llm_model"],
+            "nlu.mode": labels["nlu"],
             "geo.mode": labels["geo"],
             "session.id": session_id,
         }

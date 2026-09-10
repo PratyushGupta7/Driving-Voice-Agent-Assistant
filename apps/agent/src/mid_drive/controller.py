@@ -6,18 +6,18 @@ from typing import Any
 
 from livekit.agents import AgentSession
 
-from .events import EventBus
+from .events import EventBus, monotonic_ms
 from .fixtures_data import corridor_snapshot
 from .models import FenceDecision, MissionConstraints, OperationResult, OutputGate, WorkToken
-from .nlu import sanitize_patch
-from .orchestrator import PlaceSearchOrchestrator, fixture_delay_seconds
+from .nlu import resolve_patch
+from .orchestrator import PlaceSearchOrchestrator, delay_for_settings
 from .persistence import Repository
 from .providers.plan import boot_corridor
 from .reducer import reduce_mission
 from .result_fence import ResultFence
 from .revision import parse_turn
 from .session_actor import SessionActor
-from .speech import GREETING, format_candidate, looks_like_echo, sanitize_tts_text
+from .speech import GREETING, SEARCH_HOLD, format_candidate, looks_like_echo, sanitize_tts_text
 from .tasks import TaskSet
 from .turn_commit import (
     OPEN_FINISHED_IDLE_S,
@@ -70,6 +70,8 @@ class MissionController:
         self._committed_norm = ""
         self._last_user_raw = ""
         self._input_mode = "ptt"
+        self._ack_origin_ms = 0
+        self._ack_recorded = False
 
     def bind_session(self, session: AgentSession) -> None:
         self.session = session
@@ -259,19 +261,25 @@ class MissionController:
             await self._publish_live_snapshot()
             return
         self._last_user_raw = original
-        patch = sanitize_patch(
-            parse_turn(text, self.actor.constraints),
+        self._ack_origin_ms = monotonic_ms()
+        self._ack_recorded = False
+        patch, source, nlu_ms = await resolve_patch(
+            self.settings,
             text,
-            self.actor.offered(),
+            self.actor.constraints,
+            offered=self.actor.offered(),
+            prefs=self.actor.prefs,
         )
+        self.actor.note_nlu(source, patch.operation, nlu_ms)
         await self.bus.publish(
             "revision_parsed",
             {
                 "text": text,
-                "source": "rules",
+                "source": source,
                 "operation": patch.operation,
                 "select_index": patch.select_index,
                 "inquire_kind": patch.inquire_kind,
+                "nlu_ms": nlu_ms,
             },
         )
         self.actor.note_prefs(patch.parking_required, patch.avoid_tolls)
@@ -286,10 +294,14 @@ class MissionController:
             chosen = self.actor.select_offered(patch.select_index, patch.select_name)
             if chosen is None and patch.select_index == 2 and self.actor.constraints is not None:
                 self.actor.reject_selected()
+                started = False
                 if self.actor.status == "active":
-                    self._start_plan(self.actor.constraints)
+                    started = self._start_plan(self.actor.constraints)
                 await self._persist_and_publish(text)
-                await self.gated_say(token, "Looking for another.")
+                spoken = "Looking for another."
+                if started:
+                    spoken = spoken + self._search_hold_clause()
+                await self.gated_say(token, spoken)
                 return
             await self._persist_and_publish(text)
             if chosen is None:
@@ -322,11 +334,14 @@ class MissionController:
         if patch.operation == "next":
             self.actor.reject_selected()
             token = self.actor.reopen_same_mission()
+            started = False
             if self.actor.constraints is not None and self.actor.status == "active":
-                self._start_plan(self.actor.constraints)
+                started = self._start_plan(self.actor.constraints)
             await self._persist_and_publish(text)
-            if reduced.acknowledgement:
-                await self.gated_say(token, reduced.acknowledgement)
+            spoken = reduced.acknowledgement or "Looking for another."
+            if started:
+                spoken = spoken + self._search_hold_clause()
+            await self.gated_say(token, spoken)
             return
 
         if patch.operation == "ambiguous" or reduced.status == "clarifying":
@@ -343,15 +358,20 @@ class MissionController:
             token = self.actor.commit_revision(
                 reduced.constraints, reduced.status, True, keep_places=hold
             )
+            started = False
             if (
                 reduced.replan
                 and not hold
                 and reduced.status == "active"
                 and self.actor.constraints is not None
             ):
-                self._start_plan(self.actor.constraints)
+                started = self._start_plan(self.actor.constraints)
+            if reduced.status == "cancelled":
+                self.actor.clear_search()
             await self._persist_and_publish(text)
             spoken = self._parking_revision_speech(patch, reduced.acknowledgement, dropped)
+            if spoken and started:
+                spoken = spoken + self._search_hold_clause()
             if spoken:
                 await self.gated_say(
                     token,
@@ -379,6 +399,12 @@ class MissionController:
             patch.prefer_along,
         )
         return all(item is None for item in extras)
+
+    def _search_hold_clause(self) -> str:
+        delay = delay_for_settings(self.settings, self.actor.mission_version)
+        if delay >= 2:
+            return f" {SEARCH_HOLD}"
+        return ""
 
     def _parking_revision_speech(self, patch, acknowledgement: str | None, dropped) -> str | None:
         if patch.parking_required is True and dropped is not None:
@@ -434,7 +460,14 @@ class MissionController:
         spoken = self.session.say(cleaned, allow_interruptions=not self.actor.protect_speech)
         self.actor.current_speech_handle = spoken
         self.actor.mark_speech_started()
-        await self.bus.publish("agent_utterance", {"text": cleaned})
+        if not self._ack_recorded and self._ack_origin_ms:
+            self.actor.note_ack(monotonic_ms() - self._ack_origin_ms)
+            self._ack_recorded = True
+        await self.bus.publish(
+            "agent_utterance",
+            {"text": cleaned, "ack_ms": self.actor.cockpit.last_ack_ms},
+        )
+        await self.bus.publish("cockpit", self.actor.cockpit.model_dump(mode="json"))
 
     def publish_corridor(self) -> None:
         self.background.spawn(self._boot_corridor(), name="corridor")
@@ -447,7 +480,7 @@ class MissionController:
         await self.bus.publish("map_corridor", route.model_dump(mode="json"))
 
     def _tool_started(self, token: WorkToken, kind: str) -> None:
-        delay = fixture_delay_seconds(token.mission_version, self.settings.geo_mode)
+        delay = delay_for_settings(self.settings, token.mission_version)
         self.background.spawn(
             self.bus.publish(
                 "tool_update",
@@ -466,11 +499,13 @@ class MissionController:
             name=f"tool-started-{kind}",
         )
 
-    def _start_plan(self, constraints: MissionConstraints) -> None:
+    def _start_plan(self, constraints: MissionConstraints) -> bool:
         if self.actor.output_gate.value != "open":
-            return
+            return False
+        delay = delay_for_settings(self.settings, self.actor.mission_version)
         route_token = self.actor.issue_token("route")
         place_token = self.actor.issue_token("place_search")
+        self.actor.mark_search(delay, place_token.request_id)
         self._tool_started(route_token, "route")
         self._tool_started(place_token, "place_search")
         task = self.background.spawn(
@@ -479,6 +514,7 @@ class MissionController:
         )
         self.actor.register_task(route_token.request_id, task)
         self.actor.register_task(place_token.request_id, task)
+        return True
 
     def _finished_payload(
         self,
@@ -504,6 +540,25 @@ class MissionController:
             "area": area if decision is FenceDecision.ACCEPTED else None,
             "fallback_used": result.fallback_used,
         }
+
+    async def _publish_cancelled_as_stale(self, route_token: WorkToken, place_token: WorkToken) -> None:
+        """Cancellation is best-effort. The judged UI still needs an OBSOLETE row."""
+        for token, kind in ((route_token, "route"), (place_token, "place_search")):
+            result = OperationResult(
+                token=token,
+                operation_id=token.request_id,
+                provider=self.settings.geo_mode,
+                error="cancelled_after_barrier",
+            )
+            decision = await asyncio.shield(self.orchestrator.fence.commit(result))
+            if decision is FenceDecision.STALE_REJECTED:
+                self.actor.note_stale(kind, token.mission_version, token.output_epoch)
+            await self.bus.publish(
+                "tool_update",
+                self._finished_payload(token, kind, decision, result),
+            )
+        await self.bus.publish("mission_snapshot", self.actor.snapshot().model_dump(mode="json"))
+        await self.bus.publish("cockpit", self.actor.cockpit.model_dump(mode="json"))
 
     async def _run_plan(
         self,
@@ -538,6 +593,16 @@ class MissionController:
                     area=accepted_place.area if accepted_place else None,
                 ),
             )
+            for token, kind, decision in (
+                (route_token, "route", run.route_decision),
+                (place_token, "place_search", run.place_decision),
+            ):
+                if decision is FenceDecision.STALE_REJECTED:
+                    self.actor.note_stale(kind, token.mission_version, token.output_epoch)
+                elif decision is FenceDecision.ACCEPTED:
+                    self.actor.note_accepted()
+            if run.route_decision is FenceDecision.STALE_REJECTED or run.place_decision is FenceDecision.STALE_REJECTED:
+                await self.bus.publish("mission_snapshot", self.actor.snapshot().model_dump(mode="json"))
             if run.route_decision is FenceDecision.ACCEPTED and run.outcome.route:
                 await self.bus.publish("map_corridor", run.outcome.route.model_dump(mode="json"))
             if run.place_decision is FenceDecision.ACCEPTED:
@@ -560,27 +625,7 @@ class MissionController:
                 if run.spoken:
                     await self.speak_now(run.spoken, place_token)
         except asyncio.CancelledError:
-            for token, kind in ((route_token, "route"), (place_token, "place_search")):
-                await self.repository.record_operation(
-                    OperationResult(
-                        token=token,
-                        operation_id=token.request_id,
-                        provider=self.settings.geo_mode,
-                    ),
-                    "cancel_requested",
-                )
-                await self.bus.publish(
-                    "tool_update",
-                    {
-                        "phase": "cancelled",
-                        "kind": kind,
-                        "decision": "cancel_requested",
-                        "label": "CANCEL_REQUESTED",
-                        "mission_version": token.mission_version,
-                        "output_epoch": token.output_epoch,
-                        "request_id": token.request_id,
-                    },
-                )
+            await self._publish_cancelled_as_stale(route_token, place_token)
             raise
         except Exception as exc:
             logger.warning("mission plan failed: %s", exc)
@@ -598,6 +643,8 @@ class MissionController:
                         "error": type(exc).__name__,
                     },
                 )
+        finally:
+            self.actor.clear_search_for(place_token.request_id)
 
     async def _publish_accepted_map(self, token: WorkToken, chosen) -> None:
         await self.bus.publish("mission_snapshot", self.actor.snapshot().model_dump(mode="json"))
