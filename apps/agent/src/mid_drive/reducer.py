@@ -56,7 +56,7 @@ def reduce_mission(
         )
 
     if patch.operation == "ambiguous":
-        question = patch.clarification_question or "Coffee, fuel, or a pharmacy?"
+        question = patch.clarification_question or "Coffee, juice, fuel, or a pharmacy?"
         return ReduceResult(
             changed=False,
             constraints=current,
@@ -82,7 +82,7 @@ def reduce_mission(
                 changed=False,
                 constraints=current,
                 status="clarifying",
-                acknowledgement="Coffee, fuel, or a pharmacy?",
+                acknowledgement="Coffee, juice, fuel, or a pharmacy?",
                 speak_now=True,
             )
         parking = patch.parking_required

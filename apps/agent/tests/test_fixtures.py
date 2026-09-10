@@ -35,6 +35,22 @@ def test_detour_filter() -> None:
     assert tight is None
 
 
+def test_juice_demo_ranks() -> None:
+    first = pick_candidate(MissionConstraints(category="juice"))
+    assert first is not None and first.id == "fresh-juice-nh48"
+    parked = pick_candidate(MissionConstraints(category="juice", parking_required=True))
+    assert parked is not None and parked.id == "raw-pressery-cyber-hub"
+    tolls = pick_candidate(
+        MissionConstraints(category="juice", parking_required=True, avoid_tolls=True)
+    )
+    assert tolls is not None and tolls.id == "the-juicery-cyber-hub"
+    other = pick_candidates(
+        MissionConstraints(category="juice", parking_required=True, avoid_tolls=True),
+        skip_ids={"the-juicery-cyber-hub"},
+    )
+    assert other[0].id == "raw-pressery-cyber-hub"
+
+
 def test_candidates_have_coordinates() -> None:
     chosen = pick_candidate(MissionConstraints(category="coffee"))
     assert chosen is not None

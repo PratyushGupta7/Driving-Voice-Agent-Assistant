@@ -35,7 +35,7 @@ export function MissionPanel({
       </div>
       {!snapshot || snapshot.status === "idle" ? (
         <p className="mt-3 text-sm leading-6 text-[#cfc6b8]">
-          Ask for coffee, fuel, or a pharmacy. You can add parking, tolls, a landmark, or a
+          Ask for coffee, juice, fuel, or a pharmacy. You can add parking, tolls, a landmark, or a
           destination while I am still talking.
         </p>
       ) : (

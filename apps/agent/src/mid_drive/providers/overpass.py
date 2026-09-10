@@ -10,6 +10,7 @@ AMENITY = {
     "coffee": (("amenity", "cafe"), ("shop", "coffee")),
     "fuel": (("amenity", "fuel"),),
     "pharmacy": (("amenity", "pharmacy"),),
+    "juice": (("shop", "juice"), ("shop", "beverages")),
 }
 
 

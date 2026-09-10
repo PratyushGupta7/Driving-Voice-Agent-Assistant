@@ -86,8 +86,11 @@ class MissionController:
         if self._committed_norm and is_duplicate_or_shorter(self._committed_norm, key):
             return
         self._pending_partial = cleaned
-        if is_final and looks_answerable(cleaned, self.actor.constraints):
-            self.background.spawn(self.commit_heard(cleaned, "final"), name="commit-final")
+        if looks_answerable(cleaned, self.actor.constraints) and (
+            is_final or looks_finished(cleaned)
+        ):
+            reason = "final" if is_final else "partial_ready"
+            self.background.spawn(self.commit_heard(cleaned, reason), name="commit-heard")
             return
         if not looks_finished(cleaned):
             return
@@ -292,17 +295,21 @@ class MissionController:
         if patch.operation == "select":
             token = self.actor.reopen_same_mission()
             chosen = self.actor.select_offered(patch.select_index, patch.select_name)
+            if chosen is None:
+                chosen = self.actor.select_from_cache(patch.select_index, patch.select_name)
             if chosen is None and patch.select_index == 2 and self.actor.constraints is not None:
-                self.actor.reject_selected()
-                started = False
-                if self.actor.status == "active":
-                    started = self._start_plan(self.actor.constraints)
-                await self._persist_and_publish(text)
-                spoken = "Looking for another."
-                if started:
-                    spoken = spoken + self._search_hold_clause()
-                await self.gated_say(token, spoken)
-                return
+                # Last resort: do not pretend index 2 is "another one" when a pin is already in play.
+                if self.actor.selected is None:
+                    self.actor.reject_selected()
+                    started = False
+                    if self.actor.status == "active":
+                        started = self._start_plan(self.actor.constraints)
+                    await self._persist_and_publish(text)
+                    spoken = "Looking for another."
+                    if started:
+                        spoken = spoken + self._search_hold_clause()
+                    await self.gated_say(token, spoken)
+                    return
             await self._persist_and_publish(text)
             if chosen is None:
                 await self.gated_say(token, "I do not have that option yet. Ask me to search first.")

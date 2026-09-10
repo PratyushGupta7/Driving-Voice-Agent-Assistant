@@ -30,6 +30,8 @@ _GENERIC = {
     "for",
     "coffee",
     "cafe",
+    "juice",
+    "smoothie",
     "shop",
     "petrol",
     "pump",

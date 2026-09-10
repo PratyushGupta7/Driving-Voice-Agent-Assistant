@@ -11,9 +11,9 @@ _CANCEL_MISSION = re.compile(
 )
 _PARKING_ON = re.compile(
     r"\b((it )?needs parking|parking required|with parking|has to have parking|"
-    r"need(?:s)? parking|need(?:s)? a (parking )?lot|want parking|must have parking|"
-    r"parking chahiye|parking too|parking as well|also (need )?parking|"
-    r"and parking|also a lot|require[sd]? parking)\b",
+    r"need(?:s)?(?: to have)? parking|need(?:s)? a (parking )?lot|want parking|must have parking|"
+    r"parking chahiye|parking (too|to|2)|parking as well|also (need )?parking|"
+    r"and parking|also a lot|add parking|require[sd]? parking)\b",
     re.I,
 )
 _PARKING_OFF = re.compile(
@@ -51,9 +51,17 @@ _WORD_MINUTES = {
 _CLOSER = re.compile(r"\b(too far|shorter detour|less of a detour)\b", re.I)
 _CLOSER_BARE = re.compile(r"\b(closer|nearer)\b", re.I)
 _COFFEE = re.compile(r"\b(coffee|caf[eé]|barista|espresso|chai|caffeine|latte|cappuccino)\b", re.I)
+_JUICE = re.compile(
+    r"\b(juice|juices|juicer|smoothie|smoothies|juice shop|juice bar|juice corner|fresh juice)\b",
+    re.I,
+)
 _THIRSTY = re.compile(r"\b(i(?:'m| am) thirsty|need (?:a )?(?:drink|caffeine)|need caffeine)\b", re.I)
 _FUEL = re.compile(
     r"\b(fuel|gas station|petrol pump|petrol station|filling station|petrol|diesel|gas)\b",
+    re.I,
+)
+_FUEL_STT = re.compile(
+    r"\b(?:actually|need|want|get|find|look for).{0,20}\b(full|fool)\b",
     re.I,
 )
 _LOW_FUEL = re.compile(r"\b(low on (?:gas|fuel|petrol)|tank is low|running (?:on )?empty)\b", re.I)
@@ -100,8 +108,10 @@ _PREFER_END = re.compile(
     re.I,
 )
 _SELECT_ORDINAL = re.compile(
-    r"\b(?:the )?(first|1st|pehla|pehli|second|2nd|doosra|doosri|third|3rd|teesra|"
-    r"other one|option\s*([123])|number\s*([123]))\b",
+    r"\b(?:(?:go with|pick|choose|take|want) )?(?:the )?"
+    r"(first|1st|pehla|pehli|second|2nd|doosra|doosri|third|3rd|teesra|"
+    r"other one|option\s*([123])|number\s*([123]|one|two|three))"
+    r"(?:\s+(?:one|option|place|shop))?\b",
     re.I,
 )
 _SELECT_NAME = re.compile(
@@ -120,8 +130,14 @@ _INQUIRE_ETA = re.compile(
     re.I,
 )
 _INQUIRE_PARK = re.compile(
-    r"\b(does (?:it|[a-z0-9 .'-]{1,32}) have parking|any parking|parking there|"
-    r"have parking|is there parking|what about parking|any lot)\b",
+    r"\b("
+    r"does (?:it|this|that|[a-z0-9 .'-]{1,32}) have (?:a |any )?(?:parking(?: lot)?|lot)|"
+    r"do they have (?:a |any )?(?:parking(?: lot)?|lot)|"
+    r"is there (?:a |any )?(?:parking(?: lot)?|lot)|"
+    r"any parking|parking there|parking here|"
+    r"have (?:a |any )?(?:parking(?: lot)?|lot)|"
+    r"what about parking|got parking|any lot"
+    r")\b",
     re.I,
 )
 _INQUIRE_HELP = re.compile(
@@ -142,7 +158,7 @@ _INQUIRE_COMPARE = re.compile(r"\b(compare|versus|vs\.?|difference)\b", re.I)
 _INQUIRE_HOURS = re.compile(r"\b(hours|open|closing)\b", re.I)
 _INQUIRE_WHERE = re.compile(
     r"\b(where(?:'s| is) (it|that)|which area|"
-    r"where(?:'s| is) (?:the )?(?:coffee|shop|place|stop|one))\b",
+    r"where(?:'s| is) (?:the )?(?:coffee|juice|shop|place|stop|one))\b",
     re.I,
 )
 _INQUIRE_FOUND = re.compile(
@@ -192,6 +208,14 @@ _STOP = {
     "cafe",
     "café",
     "chai",
+    "juice",
+    "juices",
+    "smoothie",
+    "smoothies",
+    "juicer",
+    "fresh",
+    "corner",
+    "bar",
     "fuel",
     "gas",
     "petrol",
@@ -269,7 +293,9 @@ def _categories(text: str) -> list[str]:
     found: list[str] = []
     if _COFFEE.search(text) or _THIRSTY.search(text):
         found.append("coffee")
-    if _FUEL.search(text) or _LOW_FUEL.search(text):
+    if _JUICE.search(text):
+        found.append("juice")
+    if _FUEL.search(text) or _LOW_FUEL.search(text) or _FUEL_STT.search(text):
         found.append("fuel")
     if _PHARMACY.search(text):
         found.append("pharmacy")
@@ -287,19 +313,29 @@ def _clean(text: str) -> str:
     return " ".join(stripped.split())
 
 
+_ORDINAL_WORDS = {"one": 1, "two": 2, "three": 3}
+
+
 def _ordinal(match: re.Match[str]) -> int:
     token = (match.group(1) or match.group(2) or match.group(3) or "").lower()
-    if token in {"first", "1st", "pehla", "pehli", "1"}:
+    if token in {"first", "1st", "pehla", "pehli", "1", "one"}:
         return 1
-    if token in {"second", "2nd", "doosra", "doosri", "other one", "2"}:
+    if token in {"second", "2nd", "doosra", "doosri", "other one", "2", "two"}:
         return 2
-    if token in {"third", "3rd", "teesra", "3"}:
+    if token in {"third", "3rd", "teesra", "3", "three"}:
         return 3
     if token.startswith("option"):
-        return int(match.group(2) or 1)
+        raw = str(match.group(2) or "1").lower()
+        return _ORDINAL_WORDS.get(raw, int(raw) if raw.isdigit() else 1)
     if token.startswith("number"):
-        return int(match.group(3) or 1)
+        raw = str(match.group(3) or "1").lower()
+        return _ORDINAL_WORDS.get(raw, int(raw) if raw.isdigit() else 1)
     return 1
+
+
+def _last_clause(text: str) -> str:
+    parts = [part.strip() for part in re.split(r"[.!?]+", text or "") if part.strip()]
+    return parts[-1] if parts else (text or "").strip()
 
 
 def _leftover_brand(text: str) -> str | None:
@@ -313,6 +349,22 @@ def _leftover_brand(text: str) -> str | None:
 
 def parse_turn(text: str, current: MissionConstraints | None) -> MissionPatch:
     """Deterministic revision parser. None-fields mean 'not mentioned'."""
+    raw = " ".join((text or "").strip().split())
+    if not raw:
+        return MissionPatch(operation="unrelated")
+    last = _last_clause(raw)
+    if current is not None and last and last.casefold() != raw.casefold():
+        tail = _parse_single(last, current)
+        if tail.operation == "select":
+            return tail
+        if tail.operation == "add" and tail.parking_required is True:
+            return tail
+        if tail.operation == "replace" and tail.category:
+            return tail
+    return _parse_single(raw, current)
+
+
+def _parse_single(text: str, current: MissionConstraints | None) -> MissionPatch:
     raw = " ".join(text.strip().split())
     if not raw:
         return MissionPatch(operation="unrelated")
@@ -359,7 +411,7 @@ def parse_turn(text: str, current: MissionConstraints | None) -> MissionPatch:
         if _INQUIRE_FOUND.search(cleaned):
             return MissionPatch(operation="inquire", inquire_kind="why")
         ordinal = _SELECT_ORDINAL.search(cleaned)
-        if ordinal and not _FIND.search(cleaned):
+        if ordinal and not ( _FIND.search(cleaned) and _categories(cleaned) ):
             return MissionPatch(operation="select", select_index=_ordinal(ordinal))
         named = _SELECT_NAME.search(cleaned)
         if named:
@@ -369,7 +421,7 @@ def parse_turn(text: str, current: MissionConstraints | None) -> MissionPatch:
     if len(cats) > 1:
         return MissionPatch(
             operation="ambiguous",
-            clarification_question="Coffee, fuel, or a pharmacy — which one?",
+            clarification_question="Coffee, juice, fuel, or a pharmacy — which one?",
         )
     category = cats[0] if cats else None
 
@@ -447,7 +499,7 @@ def parse_turn(text: str, current: MissionConstraints | None) -> MissionPatch:
         if _HUNGRY.search(cleaned) or _FIND.search(cleaned):
             return MissionPatch(
                 operation="ambiguous",
-                clarification_question="Coffee, fuel, or a pharmacy?",
+                clarification_question="Coffee, juice, fuel, or a pharmacy?",
             )
         return MissionPatch(operation="unrelated")
 
@@ -467,7 +519,7 @@ def parse_turn(text: str, current: MissionConstraints | None) -> MissionPatch:
         if category is None:
             return MissionPatch(
                 operation="ambiguous",
-                clarification_question="Coffee, fuel, or a pharmacy?",
+                clarification_question="Coffee, juice, fuel, or a pharmacy?",
                 **{key: value for key, value in fields.items() if key != "category"},
             )
         return MissionPatch(operation="create", **fields)

@@ -14,7 +14,7 @@ from .models import MissionConstraints, MissionPatch
 logger = logging.getLogger("mid_drive.llm_revision")
 
 _MISSIONISH = re.compile(
-    r"\b(find|look for|search|parking|toll|coffee|cafe|caf[eé]|fuel|gas|petrol|"
+    r"\b(find|look for|search|parking|toll|coffee|cafe|caf[eé]|juice|smoothie|fuel|gas|petrol|"
     r"pharmacy|chemist|detour|minutes|cancel|stop looking|near|destination|"
     r"head to|take me|start from|reroute|another|second|keep this|"
     r"where|hours|open|compare|why)\b",
@@ -26,11 +26,11 @@ You convert one driver utterance into a mission patch JSON object for a Gurgaon 
 Return only JSON. Never invent place names, travel times, or parking occupancy.
 
 operation MUST be one of: create, add, replace, cancel, unrelated, ambiguous, confirm, next, select, inquire.
-category MUST be coffee, fuel, pharmacy, or null.
+category MUST be coffee, juice, fuel, pharmacy, or null.
 inquire_kind MUST be why, eta, parking, other, compare, hours, where, help, status, or null.
 
 Rules:
-1. New search for coffee/fuel/pharmacy -> create + category.
+1. New search for coffee/juice/fuel/pharmacy -> create + category.
 2. Extra constraint on the current search (parking, tolls, detour, landmark) -> add.
 3. Switch category -> replace.
 4. Cancel / stop looking / forget it -> cancel.

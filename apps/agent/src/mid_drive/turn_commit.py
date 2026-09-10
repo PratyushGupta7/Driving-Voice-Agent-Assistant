@@ -15,11 +15,11 @@ _MULTI = re.compile(r"\s+")
 _TRAILING_CUT = re.compile(r"(\.{2,}|…|-|—)$")
 _ARTICLE_BARE = re.compile(
     r"\b(find|look for|search|need|want|get|sign a)\s+a\s+"
-    r"(coffee|caf[eé]|chai|fuel|gas|petrol|pharmacy)\s*$",
+    r"(coffee|caf[eé]|chai|juice|smoothie|fuel|gas|petrol|pharmacy)\s*$",
     re.I,
 )
 _HAS_CATEGORY = re.compile(
-    r"\b(coffee|caf[eé]|chai|fuel|petrol|gas|pharmacy|chemist)\b",
+    r"\b(coffee|caf[eé]|chai|juice|juicer|smoothie|fuel|petrol|gas|pharmacy|chemist)\b",
     re.I,
 )
 _SEARCH_CLOSER = re.compile(
@@ -29,9 +29,11 @@ _SEARCH_CLOSER = re.compile(
 _SHORT_DONE = re.compile(
     r"\b(keep (this|that|it)|that (one )?works|sounds good|cancel|forget it|never mind|"
     r"another one|another option|not that|somewhere else|first|second|third|avoid (the )?tolls?|"
-    r"allow tolls?|needs parking|need parking|parking too|parking required|"
-    r"why this|how much extra|does .+ have parking|is there parking|"
+    r"allow tolls?|needs parking|need parking|parking too|parking to|parking required|"
+    r"why this|how much extra|does .+ have parking|does .+ have a parking|"
+    r"is there parking|is there a parking|"
     r"any parking|the second one|the first one|the third one|"
+    r"second one|first one|third one|number two|option two|"
     r"where is (it|that)|which area|are they open|compare( them)?|"
     r"what('s| is) the other|other option|what else|what did you find|"
     r"go with |yeh wala|koi aur|parking chahiye|"
@@ -39,9 +41,12 @@ _SHORT_DONE = re.compile(
     r"this is fine|that'?s fine|works for me|how far is it|"
     r"what about parking|what can you do|how'?s the drive|"
     r"not this one|don'?t want that|without (any )?tolls|"
-    r"i('m| am) thirsty|low on (gas|fuel)|need caffeine|grab (a )?coffee|"
+    r"i('m| am) thirsty|low on (gas|fuel)|need caffeine|grab (a )?(coffee|juice)|"
+    r"need (a )?juice|juice shop|fresh juice|"
     r"what'?s taking|still looking|still searching|any update|"
-    r"within (five|three|ten) minutes|i('m| am) hungry)\b",
+    r"within (five|three|ten) minutes|i('m| am) hungry|"
+    r"actually.{0,24}(fuel|petrol|gas|full|juice)|need (a )?(fuel|petrol|gas|full|juice)|"
+    r"i need fuel|i need petrol)\b",
     re.I,
 )
 _HANG_LAST = {

@@ -48,6 +48,7 @@ class FakeSession:
 # (utterance, current category or None, expected operation, extra checks)
 PARSER_CASES: list[tuple[str, str | None, str, dict]] = [
     ("Find a coffee shop near my route.", None, "create", {"category": "coffee", "parking": None}),
+    ("Find a juice shop near my route.", None, "create", {"category": "juice", "parking": None}),
     ("Wait, it needs parking.", "coffee", "add", {"parking": True}),
     ("Wait, I need parking too.", "coffee", "add", {"parking": True}),
     ("Does Chai Point have parking?", "coffee", "inquire", {"kind": "parking"}),

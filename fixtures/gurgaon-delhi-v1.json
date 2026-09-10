@@ -101,6 +101,44 @@
         "detour_minutes": 4
       }
     ],
+    "juice": [
+      {
+        "id": "raw-pressery-cyber-hub",
+        "name": "Raw Pressery",
+        "area": "Cyber Hub",
+        "lat": 28.4954,
+        "lng": 77.0887,
+        "parking": "yes",
+        "detour_minutes": 7
+      },
+      {
+        "id": "the-juicery-cyber-hub",
+        "name": "The Juicery",
+        "area": "Cyber Hub",
+        "lat": 28.4956,
+        "lng": 77.08895,
+        "parking": "yes",
+        "detour_minutes": 6
+      },
+      {
+        "id": "booster-juice-dlf-2",
+        "name": "Booster Juice",
+        "area": "DLF Phase 2",
+        "lat": 28.4869,
+        "lng": 77.0931,
+        "parking": "unknown",
+        "detour_minutes": 5
+      },
+      {
+        "id": "fresh-juice-nh48",
+        "name": "Fresh Juice Corner",
+        "area": "NH 48 lay-by",
+        "lat": 28.4821,
+        "lng": 77.0781,
+        "parking": "no",
+        "detour_minutes": 3
+      }
+    ],
     "pharmacy": [
       {
         "id": "apollo-mg-road",

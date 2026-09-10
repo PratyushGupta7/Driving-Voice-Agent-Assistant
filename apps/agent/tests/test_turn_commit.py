@@ -24,6 +24,7 @@ def test_fragments_are_unfinished() -> None:
 
 def test_finished_requests() -> None:
     assert looks_finished("Find a coffee shop near my route.")
+    assert looks_finished("Find a juice shop near my route.")
     assert looks_finished("Wait, I need parking too.")
     assert looks_finished("Wait, it needs parking")
     assert looks_finished("Keep this one")

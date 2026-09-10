@@ -156,7 +156,7 @@ def format_inquire(
 ) -> str:
     if kind == "help":
         return (
-            "I can find coffee, fuel, or a pharmacy on this Gurgaon to Delhi drive. "
+            "I can find coffee, juice, fuel, or a pharmacy on this Gurgaon to Delhi drive. "
             "You can require parking, avoid tolls, pick another option, or cancel."
         )
     if kind == "status":
@@ -175,7 +175,7 @@ def format_inquire(
             return f"The current stop is {spoken_place(selected.name)} in {selected.area}."
         if constraints:
             return f"Still looking for {constraints.category} on the way."
-        return "No stop in play yet. Ask for coffee, fuel, or a pharmacy."
+        return "No stop in play yet. Ask for coffee, juice, fuel, or a pharmacy."
     if selected is None and kind != "compare":
         return "I do not have a place in play yet."
     if kind == "why" and selected:

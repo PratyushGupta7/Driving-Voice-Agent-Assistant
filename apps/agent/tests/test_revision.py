@@ -21,6 +21,20 @@ def test_create_coffee() -> None:
     assert patch.avoid_tolls is None
 
 
+def test_create_juice() -> None:
+    patch = parse_turn("Find a juice shop near my route", None)
+    assert patch.operation == "create"
+    assert patch.category == "juice"
+    assert patch.parking_required is None
+    assert patch.brand_query is None
+    assert parse_turn("I need a smoothie", None).category == "juice"
+    current = MissionConstraints(category="juice")
+    assert parse_turn("Wait, I need parking too.", current).operation == "add"
+    assert parse_turn("The second one.", current).operation == "select"
+    assert parse_turn("Actually, I need fuel.", current).operation == "replace"
+    assert parse_turn("Actually, I need fuel.", current).category == "fuel"
+
+
 def test_add_parking() -> None:
     current = MissionConstraints(category="coffee")
     patch = parse_turn("Wait, it needs parking", current)
@@ -38,6 +52,21 @@ def test_restated_coffee_plus_parking_is_add_only() -> None:
     assert patch.operation == "add"
     assert patch.parking_required is True
     assert patch.category is None
+
+
+def test_demo_stt_variants_parking_and_second() -> None:
+    current = MissionConstraints(category="coffee")
+    assert parse_turn("Does it have a parking lot?", current).inquire_kind == "parking"
+    assert parse_turn("Does this have parking?", current).inquire_kind == "parking"
+    assert parse_turn("Do they have parking?", current).inquire_kind == "parking"
+    assert parse_turn("Wait I need parking to.", current).operation == "add"
+    assert parse_turn("Wait I need parking to.", current).parking_required is True
+    assert parse_turn("Another one. The second one.", current).operation == "select"
+    assert parse_turn("Another one. The second one.", current).select_index == 2
+    assert parse_turn("Compare them. The second one.", current).operation == "select"
+    assert parse_turn("I want the second one.", current).operation == "select"
+    assert parse_turn("the second one", current).select_index == 2
+    assert parse_turn("number two", current).select_index == 2
 
 
 def test_need_parking_too_is_add_not_inquire() -> None:
@@ -73,6 +102,12 @@ def test_replace_category() -> None:
     patch = parse_turn("Actually fuel", current)
     assert patch.operation == "replace"
     assert patch.category == "fuel"
+    assert parse_turn("Actually, I need fuel.", current).operation == "replace"
+    assert parse_turn("Actually, I need fuel.", current).category == "fuel"
+    assert parse_turn("I need fuel.", current).category == "fuel"
+    assert parse_turn("Actually I need full.", current).category == "fuel"
+    assert parse_turn("The second one. Actually I need fuel.", current).operation == "replace"
+    assert parse_turn("The second one. Actually I need fuel.", current).category == "fuel"
 
 
 def test_allow_tolls_again() -> None:

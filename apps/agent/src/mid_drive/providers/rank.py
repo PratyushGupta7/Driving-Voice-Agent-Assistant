@@ -10,6 +10,10 @@ _FIXTURE_SCRIPT = {
     "third-wave-dlf-2": (1, 9, 9),
     "blue-tokai-cyber-hub": (2, 0, 1),
     "starbucks-cyber-hub": (3, 1, 0),
+    "fresh-juice-nh48": (0, 9, 9),
+    "booster-juice-dlf-2": (1, 9, 9),
+    "raw-pressery-cyber-hub": (2, 0, 1),
+    "the-juicery-cyber-hub": (3, 1, 0),
 }
 
 

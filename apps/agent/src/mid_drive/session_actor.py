@@ -223,6 +223,25 @@ class SessionActor:
         self.alternatives = rest
         return chosen
 
+    def select_from_cache(self, index: int | None = None, name: str | None = None) -> PlaceCandidate | None:
+        """Recover 'the second one' when the live alt list was cleared mid-search."""
+        cached = [item.model_copy() for item in (self.cached_places or [])]
+        if not cached:
+            return None
+        skip = set(self.rejected_ids)
+        leftovers: list[PlaceCandidate] = []
+        for item in cached:
+            if not item.id or item.id in skip:
+                continue
+            if self.selected and item.id == self.selected.id:
+                continue
+            leftovers.append(item)
+        if not leftovers and not self.selected:
+            return None
+        if leftovers:
+            self.alternatives = leftovers
+        return self.select_offered(index, name)
+
     def inquire(self, kind) -> str:
         return format_inquire(
             kind,

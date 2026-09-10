@@ -64,6 +64,8 @@ PITFALLS: list[tuple[str, str | None, str, dict]] = [
     ("I need caffeine.", None, "create", {"category": "coffee", "brand": None}),
     ("I'm low on gas.", None, "create", {"category": "fuel", "brand": None}),
     ("Grab a coffee.", None, "create", {"category": "coffee", "brand": None}),
+    ("Find a juice shop near my route.", None, "create", {"category": "juice", "brand": None}),
+    ("I need juice.", None, "create", {"category": "juice", "brand": None}),
     ("Find coffee within five minutes.", None, "create", {"category": "coffee", "detour": 5}),
     ("What's taking so long?", "coffee", "inquire", {"kind": "status"}),
     ("Still looking?", "coffee", "inquire", {"kind": "status"}),

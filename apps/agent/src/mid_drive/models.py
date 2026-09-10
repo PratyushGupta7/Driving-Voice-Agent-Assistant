@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-Category = Literal["coffee", "fuel", "pharmacy"]
+Category = Literal["coffee", "fuel", "pharmacy", "juice"]
 AmenityState = Literal["yes", "no", "unknown"]
 PreferAlong = Literal["start", "end"]
 InquireKind = Literal["why", "eta", "parking", "other", "compare", "hours", "where", "help", "status"]

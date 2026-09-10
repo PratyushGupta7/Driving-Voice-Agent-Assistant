@@ -290,6 +290,9 @@ We tell one story on camera: a normal drive that deliberately breaks under stres
 | Coffee, no parking | **Chai Point** | Alt: Third Wave |
 | Coffee + parking (cold start) | **Blue Tokai** | |
 | Coffee + parking + no tolls | **Starbucks** | After the stress case |
+| Juice, no parking | **Fresh Juice Corner** | Same 9-line demo as coffee |
+| Juice + parking (cold start) | **Raw Pressery** | |
+| Juice + parking + no tolls | **The Juicery** | After the stress case |
 | Fuel | **Indian Oil** | Category replace |
 | Pharmacy | **Apollo Pharmacy** | |
 

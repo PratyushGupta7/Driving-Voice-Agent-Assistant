@@ -136,6 +136,96 @@ async def test_demo_video_path(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_eight_command_demo_path(tmp_path) -> None:
+    controller, _bus, session = await _controller(tmp_path, "eight")
+    actor = controller.actor
+
+    await controller.process_completed_turn("Find a coffee shop near my route.")
+    await _drain(controller)
+    assert actor.selected and actor.selected.name == "Chai Point"
+
+    await controller.process_completed_turn("Does it have parking?")
+    assert "no parking lot" in session.said[-1].lower()
+    assert actor.mission_version == 1
+
+    await controller.process_completed_turn("Wait, I need parking too.")
+    assert actor.selected and actor.selected.name == "Chai Point"
+    assert "parking required" in session.said[-1].lower()
+
+    await controller.process_completed_turn("Another one.")
+    await controller.process_completed_turn("What's taking so long?")
+    assert "Still searching" in session.said[-1]
+
+    await controller.process_completed_turn("Avoid toll roads too.")
+    await _drain(controller)
+    assert actor.selected and actor.selected.name == "Starbucks"
+    assert actor.cockpit.stale_rejects >= 1
+
+    await controller.process_completed_turn("Compare them.")
+    assert "versus" in session.said[-1].lower()
+
+    await controller.process_completed_turn("The second one.")
+    assert actor.selected and actor.selected.name == "Blue Tokai Coffee Roasters"
+
+    await controller.process_completed_turn("Actually, I need fuel.")
+    await _drain(controller)
+    assert actor.constraints and actor.constraints.category == "fuel"
+    assert actor.selected and actor.selected.name == "Indian Oil"
+
+
+@pytest.mark.asyncio
+async def test_juice_eight_command_demo_path(tmp_path) -> None:
+    controller, bus, session = await _controller(tmp_path, "juice")
+    actor = controller.actor
+
+    await controller.process_completed_turn("Find a juice shop near my route.")
+    await _drain(controller)
+    assert actor.mission_version == 1
+    assert actor.constraints and actor.constraints.category == "juice"
+    assert actor.selected and actor.selected.name == "Fresh Juice Corner"
+    assert "Looking for juice on the way." in session.said
+
+    await controller.process_completed_turn("Does it have parking?")
+    assert actor.mission_version == 1
+    assert actor.constraints and actor.constraints.parking_required is False
+    assert "no parking lot" in session.said[-1].lower()
+
+    await controller.process_completed_turn("Wait, I need parking too.")
+    assert actor.mission_version == 2
+    assert actor.selected and actor.selected.name == "Fresh Juice Corner"
+    assert session.said[-1] == (
+        "Got it — parking required. Fresh Juice Corner does not have a parking lot."
+    )
+
+    await controller.process_completed_turn("Another one.")
+    await controller.process_completed_turn("What's taking so long?")
+    assert "Still searching" in session.said[-1]
+
+    await controller.process_completed_turn("Avoid toll roads too.")
+    await _drain(controller)
+    assert actor.mission_version == 3
+    assert actor.selected and actor.selected.name == "The Juicery"
+    assert actor.cockpit.stale_rejects >= 1
+    obsolete = [
+        p for k, p in bus.events if k == "tool_update" and p.get("label") == "OBSOLETE"
+    ]
+    assert obsolete
+    assert all(p.get("mission_version") == 2 for p in obsolete)
+
+    await controller.process_completed_turn("Compare them.")
+    assert "versus" in session.said[-1].lower()
+    assert "Raw Pressery" in session.said[-1]
+
+    await controller.process_completed_turn("The second one.")
+    assert actor.selected and actor.selected.name == "Raw Pressery"
+
+    await controller.process_completed_turn("Actually, I need fuel.")
+    await _drain(controller)
+    assert actor.constraints and actor.constraints.category == "fuel"
+    assert actor.selected and actor.selected.name == "Indian Oil"
+
+
+@pytest.mark.asyncio
 async def test_demo_parking_inquire_before_add_is_not_constraint(tmp_path) -> None:
     controller, _bus, session = await _controller(tmp_path, "inquire")
     actor = controller.actor

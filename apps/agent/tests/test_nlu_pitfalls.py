@@ -124,9 +124,12 @@ def test_commit_gate_covers_paraphrases_not_fragments() -> None:
     assert looks_unfinished("Find a coffee")
     assert looks_finished("Find a coffee") is False
     assert looks_finished("Find a coffee shop near my route.")
+    assert looks_finished("Find a juice shop near my route.")
     assert looks_finished("Where is it?")
     assert looks_finished("What's the other option?")
     assert looks_answerable("Wait, I need parking too.")
+    assert looks_finished("Actually, I need fuel.")
+    assert looks_answerable("Actually, I need fuel.")
     assert looks_answerable("Find a") is False
 
 
